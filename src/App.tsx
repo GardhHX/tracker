@@ -5,7 +5,7 @@ import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
 import VerifyEmail from "./pages/VerifyEmail";
 import Privacy from "./pages/Privacy";
-import Tasks from "./pages/Tasks";
+import Habits from "./pages/Habits";
 import Settings from "./pages/Settings";
 
 export default function App() {
@@ -17,7 +17,7 @@ export default function App() {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
       <Route path="/privacy" element={<Privacy />} />
-      <Route path="/tasks" element={<Tasks />} />
+      <Route path="/habits" element={<Habits />} />
       <Route path="/settings" element={<Settings />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
