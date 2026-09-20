@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tracker — Pomodoro, hi-fi design</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+/* ============================================================
+   TOKENS — copied verbatim from src/app/globals.css so this renders
+   the same "quiet ledger" system as the shipped app.
+   ============================================================ */
+:root {
+  --paper: #f7f4ed;
+  --surface: #ffffff;
+  --surface-2: #fbf8f2;
+  --ink: #1b1a16;
+  --ink-soft: #3d3b34;
+  --muted: #6a675c;
+  --line: #e5e0d4;
+  --line-strong: #d8d2c3;
+  --accent: #146a46;
+  --accent-solid: #17724c;
+  --accent-ink: #ffffff;
+  --accent-wash: #e7efe8;
+  --danger: #b42318;
+  --focus: #17724c;
+  --shadow-card: 0 1px 0 rgba(27, 26, 22, 0.03), 0 1px 2px rgba(27, 26, 22, 0.05);
+  --shadow-lift: 0 18px 40px -24px rgba(27, 26, 22, 0.28);
+  --r-chip: 999px;
+  --r-btn: 10px;
+  --r-input: 12px;
+  --r-card: 14px;
+  --r-panel: 20px;
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-ui: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+:root[data-theme="dark"] {
+  --paper: #14130f;
+  --surface: #1c1b16;
+  --surface-2: #232219;
+  --ink: #f2eee4;
+  --ink-soft: #d6d2c6;
+  --muted: #a29e90;
+  --line: #302e26;
+  --line-strong: #3c3a2f;
+  --accent: #5fbe8e;
+  --accent-solid: #3dbb86;
+  --accent-ink: #0e1a12;
+  --accent-wash: #1b241e;
+  --danger: #f0a6a0;
+  --focus: #5fbe8e;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-lift: 0 22px 46px -26px rgba(0, 0, 0, 0.7);
+}
+* { box-sizing: border-box; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font-ui); font-size: 16px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+a { color: inherit; }
+button { font-family: inherit; }
+h1, h2, h3 { margin: 0; font-family: var(--font-display); font-weight: 550; line-height: 1.1; letter-spacing: -0.01em; }
+p { margin: 0; }
+.tnum { font-variant-numeric: tabular-nums; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+.label { font-family: var(--font-ui); font-size: 0.82rem; font-weight: 600; color: var(--muted); }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 18px; border-radius: var(--r-btn); border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); font-weight: 600; font-size: 0.92rem; cursor: pointer; transition: background .16s ease, border-color .16s ease, color .16s ease, transform .12s ease; }
+.btn:hover { border-color: var(--ink); }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+.btn-primary { background: var(--accent-solid); color: var(--accent-ink); border-color: transparent; }
+.btn-primary:hover:not(:disabled) { background: var(--ink); color: var(--surface); }
+:root[data-theme="dark"] .btn-primary:hover:not(:disabled) { background: var(--surface); color: var(--ink); }
+.btn-quiet { background: transparent; }
+.btn-sm { min-height: 36px; padding: 0 13px; font-size: 0.83rem; }
+.btn-lg { min-height: 52px; padding: 0 24px; font-size: 1rem; }
+.icon-btn { width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); display: grid; place-items: center; cursor: pointer; transition: border-color .15s ease; }
+.icon-btn:hover { border-color: var(--ink); }
+.field { display: flex; flex-direction: column; gap: 7px; }
+.field label { font-size: 0.86rem; font-weight: 600; color: var(--ink-soft); }
+select.input { width: 100%; min-height: 46px; padding: 0 14px; border-radius: var(--r-input); border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); font-family: var(--font-ui); font-size: 0.95rem; }
+select.input:focus { outline: none; border-color: var(--accent-solid); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-solid) 22%, transparent); }
+.field-hint { font-size: 0.82rem; color: var(--muted); }
+.chip { display: inline-flex; align-items: center; font-size: 0.74rem; font-weight: 600; color: var(--muted); border: 1px solid var(--line-strong); border-radius: var(--r-chip); padding: 3px 10px; white-space: nowrap; }
+
+/* ---------- App shell ---------- */
+.app-shell { display: grid; grid-template-columns: 240px 1fr; border: 1px solid var(--line); border-radius: var(--r-panel); overflow: hidden; background: var(--paper); }
+.app-sidebar { border-right: 1px solid var(--line); background: var(--surface-2); padding: 16px 12px; display: flex; flex-direction: column; }
+.app-brand-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 4px 20px 8px; }
+.brand { display: inline-flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 600; font-size: 1.1rem; color: var(--ink); }
+.brand-mark { display: grid; place-items: center; width: 24px; height: 24px; color: var(--surface); background: var(--ink); border-radius: 7px; }
+:root[data-theme="dark"] .brand-mark { background: var(--accent-solid); color: var(--accent-ink); }
+.app-nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.app-nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border-radius: 10px; color: var(--ink-soft); font-size: 0.9rem; font-weight: 500; text-decoration: none; }
+.app-nav-item svg { flex: none; color: var(--muted); }
+.app-nav-item:hover { background: var(--surface); color: var(--ink); }
+.app-nav-item.is-active { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: var(--shadow-card); }
+.app-nav-item.is-active svg { color: var(--accent); }
+.app-nav-tag { margin-left: auto; font-size: 0.66rem; font-weight: 600; color: var(--muted); border: 1px solid var(--line-strong); border-radius: var(--r-chip); padding: 2px 7px; }
+.app-sidebar-foot { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 10px; display: flex; align-items: center; gap: 9px; padding-left: 4px; font-size: 0.85rem; font-weight: 600; color: var(--ink); }
+.app-avatar { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: var(--accent-wash); color: var(--accent); }
+.app-main { min-width: 0; display: flex; flex-direction: column; }
+.app-topbar { display: none; align-items: center; gap: 12px; height: 54px; padding: 0 14px; background: var(--surface-2); border-bottom: 1px solid var(--line); }
+.app-topbar-title { font-family: var(--font-display); font-weight: 600; font-size: 1rem; }
+.app-content { padding: 24px clamp(16px, 4vw, 32px) 32px; }
+.page-head { margin-bottom: 20px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.page-head h1 { font-size: 1.7rem; }
+.sample-tag { font-size: 0.72rem; font-weight: 600; color: var(--muted); border: 1px solid var(--line); border-radius: var(--r-chip); padding: 3px 9px; }
+
+/* ============================================================
+   TIMER — the one focal point. The ring is a single accent stroke
+   showing time elapsed (a function, not decoration); the big number
+   is the display serif, the editorial-number motif from DESIGN.md.
+   ============================================================ */
+.pomo-layout { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(260px, 1fr); gap: 18px; align-items: start; }
+.pomo-card { border: 1px solid var(--line); border-radius: var(--r-card); background: var(--surface); padding: 28px; }
+.timer-wrap { display: flex; flex-direction: column; align-items: center; gap: 18px; text-align: center; }
+.timer-phase { display: inline-flex; align-items: center; gap: 8px; }
+.timer-ring { position: relative; width: 240px; height: 240px; }
+.timer-ring svg { transform: rotate(-90deg); display: block; }
+.timer-ring .ring-track { stroke: var(--line); }
+.timer-ring .ring-prog { stroke: var(--accent-solid); stroke-linecap: round; transition: stroke-dashoffset .3s linear; }
+.timer-ring.is-paused .ring-prog { stroke: var(--muted); }
+.timer-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+.timer-num { font-family: var(--font-display); font-size: 3.4rem; font-weight: 600; letter-spacing: -0.02em; line-height: 1; }
+.timer-sub { font-size: 0.82rem; color: var(--muted); font-weight: 500; }
+.timer-controls { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+
+/* Focus-count pips: shape + text, never color alone. */
+.pip-row { display: flex; align-items: center; gap: 10px; }
+.pips { display: flex; gap: 6px; }
+.pip { width: 12px; height: 12px; border-radius: 4px; border: 1px solid var(--line-strong); background: var(--surface); }
+.pip.is-filled { background: var(--accent-solid); border-color: transparent; }
+.pip-label { font-size: 0.8rem; color: var(--muted); font-weight: 500; }
+
+.waiting-note { display: inline-flex; align-items: center; gap: 8px; font-size: 0.86rem; color: var(--muted); font-weight: 500; }
+.waiting-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+
+/* Before-start (idle) panel */
+.idle-next { font-size: 0.86rem; color: var(--ink-soft); }
+.idle-next b { color: var(--ink); }
+
+/* History */
+.pomo-side h2 { font-size: 1.05rem; margin-bottom: 12px; }
+.hist-row { display: flex; align-items: center; gap: 10px; padding: 11px 2px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.hist-row:first-of-type { border-top: none; }
+.hist-title { flex: 1; min-width: 120px; font-size: 0.88rem; font-weight: 500; }
+.hist-time { font-size: 0.78rem; color: var(--muted); }
+.hist-outcome { font-size: 0.72rem; font-weight: 600; padding: 2px 9px; border-radius: var(--r-chip); border: 1px solid var(--line-strong); color: var(--muted); }
+.hist-outcome.is-cancelled { background-image: repeating-linear-gradient(135deg, var(--line-strong) 0, var(--line-strong) 1px, transparent 1px, transparent 6px); color: var(--ink-soft); }
+
+/* State-variant grid */
+.states-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.state-card { border: 1px solid var(--line); border-radius: var(--r-card); background: var(--surface); padding: 18px; }
+.state-card h3 { font-size: 0.98rem; margin-bottom: 12px; }
+.state-mini { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; padding: 8px 0 12px; }
+.state-mini .mini-num { font-family: var(--font-display); font-size: 1.7rem; font-weight: 600; }
+.state-desc { font-size: 0.8rem; color: var(--muted); }
+
+/* Empty / no session */
+.empty-state { text-align: center; max-width: 380px; margin: 8px auto; }
+.empty-state .es-ic { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; margin: 0 auto 18px; background: var(--surface-2); border: 1px solid var(--line); color: var(--muted); }
+.empty-state h3 { font-size: 1.3rem; }
+.empty-state p { margin-top: 10px; color: var(--ink-soft); font-size: 0.92rem; }
+
+/* Modal */
+.modal-scrim { position: fixed; inset: 0; z-index: 200; background: rgba(20,19,15,.42); display: none; align-items: center; justify-content: center; padding: 20px; }
+.modal-scrim.is-open { display: flex; }
+.modal-panel { width: 100%; max-width: 420px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-panel); box-shadow: var(--shadow-lift); padding: 24px; }
+.modal-panel:focus { outline: none; }
+.modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.modal-head h2 { font-size: 1.1rem; }
+.modal-body { font-size: 0.9rem; color: var(--ink-soft); }
+.modal-foot { display: flex; gap: 10px; margin-top: 20px; }
+.modal-foot .btn { flex: 1; }
+
+/* Document scaffolding */
+.page-wrap { max-width: 1180px; margin: 0 auto; padding: 0 20px 90px; }
+.doc-head { padding: 40px 0 30px; border-bottom: 1px solid var(--line); margin-bottom: 40px; display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+.doc-head h1 { font-size: clamp(1.8rem, 3.4vw, 2.4rem); max-width: 20ch; }
+.doc-head .lede { margin-top: 12px; color: var(--ink-soft); max-width: 62ch; font-size: 0.98rem; }
+.doc-head .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.frame-block { margin-bottom: 56px; }
+.frame-label { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.frame-label .fl-no { font-family: var(--font-display); font-size: 1.1rem; color: var(--muted); }
+.frame-label h2 { font-size: 1.2rem; }
+.frame-label .fl-note { font-size: 0.84rem; color: var(--muted); }
+.frame-shell { border-radius: var(--r-panel); box-shadow: var(--shadow-card); }
+.note { margin-top: 14px; padding: 12px 16px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line); font-size: 0.84rem; color: var(--ink-soft); }
+.note b { color: var(--ink); }
+.textlink { color: var(--accent); font-weight: 600; border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
+.closing-notes { margin-top: 60px; padding-top: 40px; border-top: 1px solid var(--line); }
+.closing-notes h2 { font-size: 1.5rem; }
+.closing-notes ul { margin: 18px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 32px; }
+.closing-notes li { font-size: 0.9rem; color: var(--ink-soft); padding: 10px 0; border-top: 1px solid var(--line); }
+.closing-notes li b { color: var(--ink); font-weight: 600; }
+
+.frame-mobile { width: 380px; max-width: 100%; }
+.frame-mobile .app-shell { display: block; }
+.frame-mobile .app-sidebar { display: none; }
+.frame-mobile .app-topbar { display: flex; }
+.frame-mobile .app-content { padding: 18px 16px 28px; }
+.frame-mobile .pomo-layout { grid-template-columns: 1fr; }
+
+@media (max-width: 860px) {
+  .app-shell { grid-template-columns: 1fr; }
+  .app-sidebar { display: none; }
+  .app-topbar { display: flex; }
+  .pomo-layout { grid-template-columns: 1fr; }
+  .states-grid { grid-template-columns: 1fr; }
+  .closing-notes ul { grid-template-columns: 1fr; }
+  .doc-head { padding-top: 24px; }
+}
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <header class="doc-head">
+    <div>
+      <span class="label">Hi-fi design reference &middot; not shipped code</span>
+      <h1>Pomodoro — from wireframe to a real screen</h1>
+      <p class="lede">
+        Built on <a class="textlink" href="tracker-wireframe.html">tracker-wireframe.html</a> (structure), <a class="textlink" href="PRD.md">PRD.md</a> REQ-05
+        (fixed 25/5/15 durations, daily cycle, one running session, server-owned deadline), in the "quiet ledger" identity from
+        <a class="textlink" href="DESIGN.md">DESIGN.md</a>. Tokens are copied from the shipped app.
+      </p>
+      <div class="meta">
+        <span class="chip">Dial: ENERGY 2 / RHYTHM 2 / MOTION 1</span>
+        <span class="chip">Ref: Mobbin — Monarch, Copilot Money</span>
+        <span class="chip">Palette: 2 core + 1 accent (unchanged)</span>
+      </div>
+    </div>
+    <button class="icon-btn" id="theme-btn" type="button" aria-label="Switch to dark theme" title="Dark theme">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6.4 6.4 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+    </button>
+  </header>
+
+  <div class="note" style="margin-bottom:48px">
+    <b>How to read this file.</b> The main timer is live: Start, Pause, Resume, and Cancel really work and the ring counts down.
+    The task picker (before start), the Cancel confirmation, and the theme toggle are real too. The state-variant grid below is
+    static, showing each phase the server can return. No backend yet, so the deadline is simulated in the tab
+    (<a class="textlink" href="PLAN.md">PLAN.md</a>, M2); the real app reconciles the phase end on the server.
+  </div>
+
+  <!-- ================= FRAME 1: MAIN SCREEN (LIVE) ================= -->
+  <div class="frame-block">
+    <div class="frame-label">
+      <span class="fl-no">01</span>
+      <h2>Pomodoro — the working screen</h2>
+      <span class="fl-note">One running session, manual phase advance (REQ-05)</span>
+    </div>
+
+    <div class="frame-shell">
+      <div class="app-shell">
+        <aside class="app-sidebar">
+          <div class="app-brand-row">
+            <span class="brand"><span class="brand-mark"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Tracker</span>
+          </div>
+          <nav class="app-nav" aria-label="Primary">
+            <a class="app-nav-item" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 11 9-8 9 8"/><path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"/></svg>Dashboard</a>
+            <a class="app-nav-item" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-6"/><path d="m9 11 3 3L22 4"/></svg>Tasks</a>
+            <a class="app-nav-item" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>Habits</a>
+            <a class="app-nav-item is-active" href="#" aria-current="page"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Pomodoro</a>
+            <a class="app-nav-item" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 5v11"/><path d="M12 5v6"/><path d="M18 5v14"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg>Projects<span class="app-nav-tag">Soon</span></a>
+            <a class="app-nav-item" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5"/><path d="M16 12h.01"/></svg>Finance<span class="app-nav-tag">Soon</span></a>
+          </nav>
+          <div class="app-sidebar-foot"><span class="app-avatar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg></span>Budi S.</div>
+        </aside>
+
+        <div class="app-main">
+          <div class="app-topbar">
+            <button class="icon-btn" type="button" aria-label="Open menu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+            <span class="app-topbar-title">Pomodoro</span>
+          </div>
+
+          <main class="app-content">
+            <div class="page-head">
+              <h1>Pomodoro</h1>
+              <span class="sample-tag">Sample data</span>
+            </div>
+
+            <div class="pomo-layout">
+              <section class="pomo-card" aria-labelledby="timer-heading">
+                <h2 id="timer-heading" class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Timer</h2>
+                <div class="timer-wrap">
+                  <span class="timer-phase"><span class="chip" id="phase-chip">Next phase: Focus</span></span>
+
+                  <div class="timer-ring" id="timer-ring">
+                    <svg width="240" height="240" viewBox="0 0 240 240" aria-hidden="true">
+                      <circle class="ring-track" cx="120" cy="120" r="108" fill="none" stroke-width="12" />
+                      <circle class="ring-prog" id="ring-prog" cx="120" cy="120" r="108" fill="none" stroke-width="12"
+                        stroke-dasharray="678.58" stroke-dashoffset="0" />
+                    </svg>
+                    <div class="timer-center">
+                      <span class="timer-num tnum" id="timer-num" aria-live="polite">25:00</span>
+                      <span class="timer-sub" id="timer-sub">Focus &middot; 25 min</span>
+                    </div>
+                  </div>
+
+                  <!-- Idle controls (before start) -->
+                  <div id="idle-controls" style="width:100%;max-width:340px;display:flex;flex-direction:column;gap:12px">
+                    <div class="field">
+                      <label for="task-select">Focus on a task (optional)</label>
+                      <select id="task-select" class="input">
+                        <option value="">No task</option>
+                        <option>Competitor research</option>
+                        <option>Prepare investor slides</option>
+                        <option>Design finance module wireframe</option>
+                      </select>
+                    </div>
+                    <button class="btn btn-primary btn-lg" id="start-btn" type="button">Start focus</button>
+                    <p class="idle-next field-hint">The next phase is decided by the server. A break can never carry a task.</p>
+                  </div>
+
+                  <!-- Running controls (hidden until start) -->
+                  <div id="run-controls" style="display:none;flex-direction:column;gap:14px;align-items:center;width:100%">
+                    <div class="timer-controls">
+                      <button class="btn" id="pause-btn" type="button">Pause</button>
+                      <button class="btn" id="cancel-btn" type="button">Cancel</button>
+                    </div>
+                    <p class="timer-sub" id="task-line">Task: Competitor research</p>
+                  </div>
+
+                  <div class="pip-row">
+                    <div class="pips" id="pips" role="img" aria-label="0 of 4 focus sessions completed toward a long break">
+                      <span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span>
+                    </div>
+                    <span class="pip-label" id="pip-label">0 of 4 focus sessions today</span>
+                  </div>
+                </div>
+              </section>
+
+              <aside class="pomo-side pomo-card">
+                <h2>Today&apos;s sessions</h2>
+                <div id="hist-list">
+                  <div class="hist-row">
+                    <span class="hist-title">Focus &middot; Competitor research</span>
+                    <span class="hist-outcome">Completed</span>
+                    <span class="hist-time tnum">09:05&ndash;09:30</span>
+                  </div>
+                  <div class="hist-row">
+                    <span class="hist-title">Short break</span>
+                    <span class="hist-outcome is-cancelled">Cancelled</span>
+                    <span class="hist-time tnum">09:30&ndash;09:31</span>
+                  </div>
+                  <div class="hist-row">
+                    <span class="hist-title">Focus &middot; No task</span>
+                    <span class="hist-outcome">Completed</span>
+                    <span class="hist-time tnum">09:40&ndash;10:05</span>
+                  </div>
+                </div>
+                <p class="field-hint" style="margin-top:14px">Cancelled sessions stay on record with their elapsed time, but do not count as a completed Pomodoro.</p>
+              </aside>
+            </div>
+          </main>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= FRAME 2: STATE VARIANTS ================= -->
+  <div class="frame-block">
+    <div class="frame-label">
+      <span class="fl-no">02</span>
+      <h2>Session states</h2>
+      <span class="fl-note">Each phase the server can return</span>
+    </div>
+    <div class="states-grid">
+      <div class="state-card">
+        <h3>Paused</h3>
+        <div class="state-mini"><span class="chip">Phase: Focus</span><span class="mini-num tnum">12:04</span><button class="btn btn-primary btn-sm" type="button">Resume</button></div>
+        <p class="state-desc">Remaining time is preserved while paused; resuming recalculates the deadline from what is left.</p>
+      </div>
+      <div class="state-card">
+        <h3>Short break</h3>
+        <div class="state-mini"><span class="chip">Phase: Short break</span><span class="mini-num tnum">05:00</span><span class="field-hint">No task</span></div>
+        <p class="state-desc">5 minutes, scheduled after any completed focus that is not a 4th. A break never carries a task.</p>
+      </div>
+      <div class="state-card">
+        <h3>Long break</h3>
+        <div class="state-mini"><span class="chip">Phase: Long break</span><span class="mini-num tnum">15:00</span><span class="field-hint">No task</span></div>
+        <p class="state-desc">15 minutes, offered after every 4th completed focus in today&apos;s cycle.</p>
+      </div>
+      <div class="state-card">
+        <h3>Completed (terminal)</h3>
+        <div class="state-mini"><span class="chip">Completed</span><span class="field-hint tnum">Focus 25:00 &middot; 09:05&ndash;09:30</span><button class="btn btn-sm" type="button">Start next phase</button></div>
+        <p class="state-desc">The server closes the phase at its deadline even if the browser was closed. The next phase never starts on its own.</p>
+      </div>
+      <div class="state-card">
+        <h3>Cancelled</h3>
+        <div class="state-mini"><span class="chip" style="background-image:repeating-linear-gradient(135deg,var(--line-strong) 0,var(--line-strong) 1px,transparent 1px,transparent 6px)">Cancelled</span><span class="field-hint tnum">Elapsed 08:12 &middot; not counted</span></div>
+        <p class="state-desc">Cancel asks for confirmation. Elapsed time stays on record but does not add to the completed count.</p>
+      </div>
+      <div class="state-card">
+        <h3>Reload / recovery</h3>
+        <div class="state-mini" style="padding-top:22px"><span class="waiting-note"><span class="waiting-dot"></span> Waiting for phase completion&hellip;</span></div>
+        <p class="state-desc">Shown when the local countdown hits zero before the server has reconciled the deadline; reopening re-fetches server_now, remaining_seconds, and next_phase.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= FRAME 3: NO SESSION / MOBILE ================= -->
+  <div class="frame-block">
+    <div class="frame-label">
+      <span class="fl-no">03</span>
+      <h2>Fresh day &amp; mobile</h2>
+      <span class="fl-note">New cycle starts at 0, next phase Focus (R-03, R-27)</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 380px;gap:24px;align-items:start" class="empty-mobile-grid">
+      <div class="frame-shell" style="border:1px solid var(--line);border-radius:var(--r-panel);padding:24px;background:var(--surface)">
+        <div class="empty-state">
+          <span class="es-ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+          <h3>Ready for a new day</h3>
+          <p>No session is running. Today&apos;s cycle starts fresh: 0 focus sessions completed, and the next phase is Focus.</p>
+          <button class="btn btn-primary" type="button" style="margin-top:18px">Start focus</button>
+        </div>
+      </div>
+      <div class="frame-mobile frame-shell" style="border:1px solid var(--line);overflow:hidden">
+        <div class="app-shell">
+          <div class="app-main">
+            <div class="app-topbar">
+              <button class="icon-btn" type="button" aria-label="Open menu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+              <span class="app-topbar-title">Pomodoro</span>
+            </div>
+            <main class="app-content">
+              <div class="page-head"><h1 style="font-size:1.35rem">Pomodoro</h1><span class="sample-tag">Sample data</span></div>
+              <section class="pomo-card" style="padding:20px">
+                <div class="timer-wrap">
+                  <span class="chip">Phase: Focus</span>
+                  <div class="timer-ring" style="width:180px;height:180px">
+                    <svg width="180" height="180" viewBox="0 0 240 240" aria-hidden="true">
+                      <circle class="ring-track" cx="120" cy="120" r="108" fill="none" stroke-width="12" />
+                      <circle class="ring-prog" cx="120" cy="120" r="108" fill="none" stroke-width="12" stroke-dasharray="678.58" stroke-dashoffset="200" transform="rotate(-90 120 120)" />
+                    </svg>
+                    <div class="timer-center"><span class="timer-num tnum" style="font-size:2.6rem">18:42</span><span class="timer-sub">Focus</span></div>
+                  </div>
+                  <div class="timer-controls"><button class="btn btn-sm" type="button">Pause</button><button class="btn btn-sm" type="button">Cancel</button></div>
+                  <p class="timer-sub">Task: Competitor research</p>
+                  <div class="pip-row"><div class="pips"><span class="pip is-filled"></span><span class="pip is-filled"></span><span class="pip"></span><span class="pip"></span></div><span class="pip-label">2 of 4 today</span></div>
+                </div>
+              </section>
+            </main>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="closing-notes">
+    <h2>Reasoning, written down (R-31)</h2>
+    <ul>
+      <li><b>The timer is the single focal point.</b> One big Fraunces number inside one accent ring; everything else on the screen defers to it.</li>
+      <li><b>The ring is a function, not decoration.</b> Its single accent stroke shows time elapsed, so it earns the accent under MOTION 1 (it advances with the countdown, it does not loop for effect).</li>
+      <li><b>Phase is text, not color.</b> Focus / Short break / Long break all use the same chip; the ring stays one green. A color-coded phase would spend the accent on decoration.</li>
+      <li><b>Focus count is pips plus text.</b> "2 of 4 focus sessions today" pairs shape with a sentence, so the progress toward a long break never depends on seeing color.</li>
+      <li><b>No auto-advance.</b> After a terminal phase the screen shows an explicit "Start next phase", matching the server rule that the next phase never starts on its own.</li>
+      <li><b>Cancel is honest.</b> The confirmation states that elapsed time stays on record but does not count as a completed Pomodoro, and cancelled rows use the hatch, not a red badge.</li>
+      <li><b>Waiting state is real.</b> When the local countdown hits zero it shows "Waiting for phase completion" instead of switching phase on the client, because only the server closes a phase.</li>
+      <li><b>Durations are fixed.</b> 25 / 5 / 15 are shown, never editable, matching the MVP decision, so there is no settings surface to fake.</li>
+    </ul>
+  </div>
+
+</div>
+
+<!-- ================= MODAL: CANCEL CONFIRM ================= -->
+<div class="modal-scrim" id="modal-cancel" data-modal>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="mc-title" tabindex="-1">
+    <div class="modal-head">
+      <h2 id="mc-title">Cancel this session?</h2>
+      <button class="icon-btn" type="button" aria-label="Close" data-close-modal>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <p class="modal-body">The time you have already focused stays on record, but this session will not count as a completed Pomodoro. You will return to a fresh Focus.</p>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-quiet" data-close-modal>Keep going</button>
+      <button type="button" class="btn btn-primary" id="confirm-cancel">Cancel session</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // Theme toggle — same mechanism as ThemeToggle.tsx.
+  var themeBtn = document.getElementById("theme-btn");
+  var sun = '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>';
+  var moon = '<path d="M12 3a6.4 6.4 0 0 0 9 9 9 9 0 1 1-9-9Z"/>';
+  themeBtn.addEventListener("click", function () {
+    var next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    themeBtn.setAttribute("aria-label", next === "dark" ? "Switch to light theme" : "Switch to dark theme");
+    themeBtn.querySelector("svg").innerHTML = next === "dark" ? sun : moon;
+  });
+
+  // ---- Live timer: real Start / Pause / Resume / Cancel on the main card. ----
+  var FOCUS = 25 * 60;
+  var CIRC = 678.58; // 2*pi*108
+  var total = FOCUS, remaining = FOCUS, tick = null, running = false, completedFocus = 0;
+
+  var num = document.getElementById("timer-num");
+  var sub = document.getElementById("timer-sub");
+  var ring = document.getElementById("timer-ring");
+  var prog = document.getElementById("ring-prog");
+  var phaseChip = document.getElementById("phase-chip");
+  var idle = document.getElementById("idle-controls");
+  var run = document.getElementById("run-controls");
+  var startBtn = document.getElementById("start-btn");
+  var pauseBtn = document.getElementById("pause-btn");
+  var cancelBtn = document.getElementById("cancel-btn");
+  var taskSelect = document.getElementById("task-select");
+  var taskLine = document.getElementById("task-line");
+  var pips = document.getElementById("pips");
+  var pipLabel = document.getElementById("pip-label");
+
+  function fmt(s) {
+    var m = Math.floor(s / 60), ss = s % 60;
+    return String(m).padStart(2, "0") + ":" + String(ss).padStart(2, "0");
+  }
+  function render() {
+    num.textContent = fmt(remaining);
+    prog.setAttribute("stroke-dashoffset", String(CIRC * (1 - remaining / total)));
+  }
+  function renderPips() {
+    var filled = completedFocus % 4;
+    if (completedFocus > 0 && filled === 0) filled = 4;
+    [].forEach.call(pips.children, function (p, i) { p.classList.toggle("is-filled", i < filled); });
+    pipLabel.textContent = filled + " of 4 focus sessions today";
+    pips.setAttribute("aria-label", filled + " of 4 focus sessions completed toward a long break");
+  }
+  function startTick() {
+    tick = window.setInterval(function () {
+      if (remaining > 0) { remaining -= 1; render(); }
+      if (remaining <= 0) { window.clearInterval(tick); tick = null; complete(); }
+    }, 1000);
+  }
+  function beginFocus() {
+    total = FOCUS; remaining = FOCUS; running = true;
+    ring.classList.remove("is-paused");
+    phaseChip.textContent = "Phase: Focus";
+    var task = taskSelect.value;
+    taskLine.textContent = task ? "Task: " + task : "Task: None";
+    idle.style.display = "none";
+    run.style.display = "flex";
+    render();
+    startTick();
+  }
+  function complete() {
+    completedFocus += 1;
+    renderPips();
+    running = false;
+    run.style.display = "none";
+    idle.style.display = "flex";
+    var isLong = completedFocus % 4 === 0;
+    phaseChip.textContent = "Next phase: " + (isLong ? "Long break" : "Short break");
+    sub.textContent = (isLong ? "Long break" : "Short break") + " · " + (isLong ? "15" : "5") + " min";
+    num.textContent = isLong ? "15:00" : "05:00";
+    prog.setAttribute("stroke-dashoffset", "0");
+    startBtn.textContent = "Start " + (isLong ? "long break" : "short break");
+    // Breaks carry no task.
+    taskSelect.parentElement.style.display = "none";
+  }
+  startBtn.addEventListener("click", function () {
+    // For the demo, every Start begins a focus-length countdown; a real break would use its own length.
+    beginFocus();
+  });
+  pauseBtn.addEventListener("click", function () {
+    if (running && tick) {
+      window.clearInterval(tick); tick = null; running = false;
+      ring.classList.add("is-paused");
+      pauseBtn.textContent = "Resume";
+      phaseChip.textContent = "Paused · Focus";
+    } else {
+      running = true;
+      ring.classList.remove("is-paused");
+      pauseBtn.textContent = "Pause";
+      phaseChip.textContent = "Phase: Focus";
+      startTick();
+    }
+  });
+
+  // Cancel -> confirmation modal.
+  var lastTrigger = null;
+  var cancelModal = document.getElementById("modal-cancel");
+  function openCancel() {
+    lastTrigger = document.activeElement;
+    cancelModal.classList.add("is-open");
+    document.body.style.overflow = "hidden";
+    cancelModal.querySelector(".modal-panel").focus();
+  }
+  function closeCancel() {
+    cancelModal.classList.remove("is-open");
+    document.body.style.overflow = "";
+    if (lastTrigger) lastTrigger.focus();
+  }
+  cancelBtn.addEventListener("click", openCancel);
+  cancelModal.addEventListener("mousedown", function (e) { if (e.target === cancelModal) closeCancel(); });
+  cancelModal.querySelectorAll("[data-close-modal]").forEach(function (b) { b.addEventListener("click", closeCancel); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && cancelModal.classList.contains("is-open")) closeCancel(); });
+  document.getElementById("confirm-cancel").addEventListener("click", function () {
+    if (tick) { window.clearInterval(tick); tick = null; }
+    running = false;
+    closeCancel();
+    // Back to a fresh Focus (cancel never increments the count).
+    total = FOCUS; remaining = FOCUS;
+    ring.classList.remove("is-paused");
+    pauseBtn.textContent = "Pause";
+    phaseChip.textContent = "Next phase: Focus";
+    sub.textContent = "Focus · 25 min";
+    render();
+    run.style.display = "none";
+    idle.style.display = "flex";
+    startBtn.textContent = "Start focus";
+    taskSelect.parentElement.style.display = "flex";
+  });
+
+  render();
+  renderPips();
+})();
+</script>
+</body>
+</html>

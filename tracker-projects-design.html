@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tracker Projects, hi-fi design</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+/* ============================================================
+   TOKENS — copied verbatim from src/app/globals.css so this file
+   renders the same "quiet ledger" system as the shipped landing
+   page and the Tasks/Habits/Pomodoro/Finance design files, not a
+   lookalike. Any drift here is a bug in this file, not a restyle.
+   ============================================================ */
+:root {
+  --paper: #f7f4ed;
+  --surface: #ffffff;
+  --surface-2: #fbf8f2;
+  --ink: #1b1a16;
+  --ink-soft: #3d3b34;
+  --muted: #6a675c;
+  --line: #e5e0d4;
+  --line-strong: #d8d2c3;
+  --accent: #146a46;
+  --accent-solid: #17724c;
+  --accent-ink: #ffffff;
+  --accent-wash: #e7efe8;
+  --danger: #b42318;
+  --focus: #17724c;
+  --shadow-card: 0 1px 0 rgba(27, 26, 22, 0.03), 0 1px 2px rgba(27, 26, 22, 0.05);
+  --shadow-lift: 0 18px 40px -24px rgba(27, 26, 22, 0.28);
+  --r-chip: 999px;
+  --r-btn: 10px;
+  --r-input: 12px;
+  --r-card: 14px;
+  --r-panel: 20px;
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-ui: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+:root[data-theme="dark"] {
+  --paper: #14130f;
+  --surface: #1c1b16;
+  --surface-2: #232219;
+  --ink: #f2eee4;
+  --ink-soft: #d6d2c6;
+  --muted: #a29e90;
+  --line: #302e26;
+  --line-strong: #3c3a2f;
+  --accent: #5fbe8e;
+  --accent-solid: #3dbb86;
+  --accent-ink: #0e1a12;
+  --accent-wash: #1b241e;
+  --danger: #f0a6a0;
+  --focus: #5fbe8e;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-lift: 0 22px 46px -26px rgba(0, 0, 0, 0.7);
+}
+* { box-sizing: border-box; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; }
+button { font-family: inherit; }
+h1, h2, h3, h4 { margin: 0; font-family: var(--font-display); font-weight: 550; line-height: 1.1; letter-spacing: -0.01em; }
+p { margin: 0; }
+.tnum { font-variant-numeric: tabular-nums; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+.label { font-family: var(--font-ui); font-size: 0.82rem; font-weight: 600; color: var(--muted); }
+
+/* ---------- Buttons / inputs (from globals.css) ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 44px; padding: 0 18px; border-radius: var(--r-btn);
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink);
+  font-weight: 600; font-size: 0.92rem; cursor: pointer;
+  transition: background .16s ease, border-color .16s ease, color .16s ease, transform .12s ease;
+}
+.btn:hover { border-color: var(--ink); }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+.btn-primary { background: var(--accent-solid); color: var(--accent-ink); border-color: transparent; }
+.btn-primary:hover:not(:disabled) { background: var(--ink); color: var(--surface); }
+:root[data-theme="dark"] .btn-primary:hover:not(:disabled) { background: var(--surface); color: var(--ink); }
+.btn-quiet { background: transparent; }
+.btn-danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
+.btn-danger:hover { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 8%, transparent); }
+.btn-sm { min-height: 36px; padding: 0 13px; font-size: 0.83rem; }
+.icon-btn {
+  width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line-strong);
+  background: var(--surface); color: var(--ink); display: grid; place-items: center; cursor: pointer;
+  transition: border-color .15s ease;
+}
+.icon-btn:hover { border-color: var(--ink); }
+.field { display: flex; flex-direction: column; gap: 7px; }
+.field label { font-size: 0.86rem; font-weight: 600; color: var(--ink-soft); }
+.input, select.input, textarea.input {
+  width: 100%; min-height: 46px; padding: 0 14px; border-radius: var(--r-input);
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink);
+  font-family: var(--font-ui); font-size: 0.95rem;
+}
+textarea.input { padding: 10px 14px; min-height: 84px; resize: vertical; line-height: 1.5; }
+.input:focus { outline: none; border-color: var(--accent-solid); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-solid) 22%, transparent); }
+.input[aria-invalid="true"] { border-color: var(--danger); }
+.field-error { font-size: 0.82rem; color: var(--danger); font-weight: 600; }
+.field-hint { font-size: 0.82rem; color: var(--muted); }
+.textlink { color: var(--accent); font-weight: 600; border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
+
+/* ---------- Chip vocabulary. Reason (R-31): DESIGN.md forbids
+   decorative capsule badges and color-only status, so project
+   status (Active/Done/Archived) and task priority read as plain
+   bordered text; the hatch flag carries "needs attention" (Blocked)
+   the same way it does Overdue on Tasks and Over budget on Finance. ---------- */
+.chip {
+  display: inline-flex; align-items: center; font-size: 0.74rem; font-weight: 600;
+  color: var(--muted); border: 1px solid var(--line-strong); border-radius: var(--r-chip);
+  padding: 3px 10px; white-space: nowrap;
+}
+.chip-flag {
+  font-size: 0.72rem; font-weight: 700; color: var(--ink-soft); border-radius: var(--r-chip);
+  padding: 3px 10px; border: 1px solid var(--line-strong);
+  background-image: repeating-linear-gradient(135deg, var(--line-strong) 0, var(--line-strong) 1px, transparent 1px, transparent 6px);
+}
+.chip-danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
+.count-badge {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px;
+  padding: 0 6px; border-radius: var(--r-chip); background: var(--surface-2); border: 1px solid var(--line-strong);
+  color: var(--muted); font-size: 0.72rem; font-weight: 700;
+}
+
+/* ---------- App shell (from globals.css) ---------- */
+.app-shell { min-height: 100%; display: grid; grid-template-columns: 240px 1fr; border: 1px solid var(--line); border-radius: var(--r-panel); overflow: hidden; background: var(--paper); }
+.app-sidebar { border-right: 1px solid var(--line); background: var(--surface-2); padding: 16px 12px; display: flex; flex-direction: column; }
+.app-brand-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 4px 20px 8px; }
+.brand { display: inline-flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 600; font-size: 1.1rem; color: var(--ink); }
+.brand-mark { display: grid; place-items: center; width: 24px; height: 24px; color: var(--surface); background: var(--ink); border-radius: 7px; }
+:root[data-theme="dark"] .brand-mark { background: var(--accent-solid); color: var(--accent-ink); }
+.app-nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.app-nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border-radius: 10px; color: var(--ink-soft); font-size: 0.9rem; font-weight: 500; text-decoration: none; }
+.app-nav-item svg { flex: none; color: var(--muted); }
+.app-nav-item:hover { background: var(--surface); color: var(--ink); }
+.app-nav-item.is-active { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: var(--shadow-card); }
+.app-nav-item.is-active svg { color: var(--accent); }
+.app-nav-tag { margin-left: auto; font-size: 0.66rem; font-weight: 600; color: var(--muted); border: 1px solid var(--line-strong); border-radius: var(--r-chip); padding: 2px 7px; }
+.app-sidebar-foot { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 10px; display: flex; align-items: center; gap: 9px; padding-left: 4px; font-size: 0.85rem; font-weight: 600; color: var(--ink); }
+.app-avatar { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: var(--accent-wash); color: var(--accent); }
+.app-main { min-width: 0; display: flex; flex-direction: column; }
+.app-topbar { display: none; align-items: center; gap: 12px; height: 54px; padding: 0 14px; background: var(--surface-2); border-bottom: 1px solid var(--line); }
+.app-topbar-title { font-family: var(--font-display); font-weight: 600; font-size: 1rem; }
+.app-content { padding: 24px clamp(16px, 4vw, 32px) 32px; }
+.page-head { margin-bottom: 18px; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.page-head h1 { font-size: 1.7rem; }
+.sample-tag { font-size: 0.72rem; font-weight: 600; color: var(--muted); border: 1px solid var(--line); border-radius: var(--r-chip); padding: 3px 9px; }
+
+/* ---------- Toolbar / segmented control ---------- */
+.toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-bottom: 16px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+.seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 10px; padding: 3px; gap: 2px; background: var(--surface); }
+.seg button { border: none; background: transparent; padding: 7px 14px; border-radius: 7px; font-size: 0.85rem; font-weight: 600; color: var(--muted); cursor: pointer; }
+.seg button[aria-selected="true"] { background: var(--surface-2); color: var(--ink); box-shadow: var(--shadow-card); }
+.filter-chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line-strong); border-radius: var(--r-chip); padding: 7px 12px; font-size: 0.82rem; font-weight: 600; color: var(--ink-soft); background: var(--surface); cursor: default; }
+.filter-chip .care { color: var(--muted); font-size: 0.7rem; }
+.toolbar .spacer { flex: 1; }
+.ref-only { font-size: 0.7rem; font-weight: 600; color: var(--muted); }
+.backlink { display: inline-flex; align-items: center; gap: 6px; font-size: 0.84rem; font-weight: 600; color: var(--muted); text-decoration: none; margin-bottom: 12px; }
+.backlink:hover { color: var(--ink); }
+
+/* ---------- Project list ---------- */
+.proj-list { border-top: 1px solid var(--line); margin-top: 4px; }
+.proj-row { display: flex; align-items: center; gap: 18px; padding: 18px 2px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.proj-main { flex: 1; min-width: 220px; }
+.proj-name { font-size: 1.02rem; font-weight: 600; display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.proj-sub { font-size: 0.82rem; color: var(--muted); margin-top: 4px; }
+.proj-bar-wrap { width: 200px; max-width: 34vw; }
+.pbar { height: 8px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); overflow: hidden; }
+.pbar > i { display: block; height: 100%; background: var(--accent-solid); border-radius: 999px; }
+.pbar > i.is-empty { width: 0; }
+.proj-pct { font-size: 0.82rem; font-weight: 700; color: var(--ink-soft); margin-top: 6px; text-align: right; }
+.proj-open { flex: none; }
+
+/* ---------- Project detail ---------- */
+.proj-detail-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 22px; flex-wrap: wrap; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+.proj-detail-head .pd-title { font-size: 1.7rem; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.proj-detail-head .pd-sub { font-size: 0.86rem; color: var(--muted); margin-top: 6px; }
+.proj-detail-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+/* The one editorial number per screen — Fraunces + the single green
+   accent for a "done" state, the identity motif reused from the
+   completed checkbox on Tasks and the total on Finance. */
+.pd-figure { text-align: right; }
+.pd-figure .pd-pct { font-family: var(--font-display); font-weight: 550; font-size: clamp(2.4rem, 6vw, 3.4rem); color: var(--accent); line-height: 1; letter-spacing: -0.015em; }
+.pd-figure .pd-caption { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
+.pd-bar { margin: 18px 0 8px; }
+
+.blocked-banner { display: flex; gap: 12px; align-items: flex-start; padding: 13px 15px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--line); margin: 16px 0 6px; }
+.blocked-banner .bb-ic { flex: none; color: var(--muted); margin-top: 1px; }
+.blocked-banner p { font-size: 0.86rem; color: var(--ink-soft); }
+.blocked-banner b { color: var(--ink); }
+
+/* ---------- Task list rows (shared with Tasks) ---------- */
+.task-list { border-top: 1px solid var(--line); }
+.task-row { display: flex; align-items: center; gap: 14px; padding: 14px 2px; border-bottom: 1px solid var(--line); }
+.chk-btn { width: 24px; height: 24px; border-radius: 7px; border: 1.5px solid var(--line-strong); background: var(--surface); display: grid; place-items: center; flex: none; cursor: pointer; color: transparent; }
+.chk-btn:hover { border-color: var(--ink); }
+.chk-btn.is-done { background: var(--accent-solid); border-color: transparent; color: var(--accent-ink); }
+.chk-btn:disabled { cursor: not-allowed; opacity: .55; }
+.task-row-title { flex: 1; min-width: 160px; font-size: 0.94rem; font-weight: 500; cursor: pointer; background: none; border: none; text-align: left; color: inherit; padding: 4px 0; font-family: inherit; }
+.task-row-title:hover { text-decoration: underline; }
+.task-row-title.is-done { text-decoration: line-through; color: var(--muted); }
+.task-row-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+/* ---------- Kanban (shared with Tasks) ---------- */
+.kanban { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
+.kan-col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.kan-col-head { display: flex; align-items: center; justify-content: space-between; font-size: 0.82rem; font-weight: 700; color: var(--ink-soft); padding: 0 2px; }
+.kan-card { border: 1px solid var(--line); border-radius: var(--r-card); background: var(--surface); padding: 13px; display: flex; flex-direction: column; gap: 10px; text-align: left; cursor: pointer; font-family: inherit; color: inherit; }
+.kan-card:hover { border-color: var(--line-strong); }
+.kan-card .kc-title { font-size: 0.9rem; font-weight: 600; }
+.kan-card .kc-meta { display: flex; gap: 6px; flex-wrap: wrap; }
+.kan-card.is-done { opacity: 0.62; }
+.kan-more { font-size: 0.8rem; color: var(--muted); padding: 4px 2px; }
+.kc-move { margin-top: 2px; }
+.kc-move select { width: 100%; min-height: 36px; font-size: 0.8rem; padding: 0 8px; border-radius: 8px; border: 1px solid var(--line-strong); background: var(--surface-2); color: var(--ink-soft); }
+
+/* ---------- Empty / loading ---------- */
+.empty-state { text-align: center; max-width: 360px; margin: 44px auto; }
+.empty-state .es-ic { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; margin: 0 auto 18px; background: var(--surface-2); border: 1px solid var(--line); color: var(--muted); }
+.empty-state h3 { font-size: 1.3rem; }
+.empty-state p { margin-top: 10px; color: var(--ink-soft); font-size: 0.92rem; }
+.empty-state .btn { margin-top: 18px; }
+.skeleton-row { height: 60px; border-radius: 10px; background: linear-gradient(90deg, var(--surface-2) 25%, var(--line) 37%, var(--surface-2) 63%); background-size: 400% 100%; animation: shimmer 1.4s ease infinite; margin-top: 12px; }
+.skeleton-row:first-child { margin-top: 0; }
+@keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+
+/* ---------- Modal ---------- */
+.modal-scrim { position: fixed; inset: 0; z-index: 200; background: rgba(20,19,15,.42); display: none; align-items: center; justify-content: center; padding: 20px; }
+.modal-scrim.is-open { display: flex; }
+.modal-panel { width: 100%; max-width: 460px; max-height: calc(100vh - 40px); overflow-y: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-panel); box-shadow: var(--shadow-lift); padding: 24px; }
+.modal-panel:focus { outline: none; }
+.modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+.modal-head h2 { font-size: 1.1rem; }
+.modal-foot { display: flex; gap: 10px; margin-top: 20px; }
+.modal-foot .btn { flex: 1; }
+.form-alert { border-radius: 10px; padding: 11px 13px; font-size: 0.86rem; font-weight: 500; background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent); }
+
+/* ---------- Detail modal contents (shared with Tasks) ---------- */
+.detail-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.detail-desc { color: var(--ink-soft); font-size: 0.9rem; }
+.detail-section { margin-top: 16px; }
+.detail-section > label { display: block; font-size: 0.82rem; font-weight: 600; color: var(--ink-soft); margin-bottom: 8px; }
+.dep-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 0.87rem; }
+.dep-row .dep-name { flex: 1; color: var(--danger); font-weight: 500; }
+.dep-row:last-of-type { border-bottom: none; }
+.detail-hist-row { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; font-size: 0.85rem; }
+.detail-hist-row .dh-k { color: var(--muted); }
+.detail-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 18px; }
+.blocked-hint { font-size: 0.78rem; color: var(--danger); margin-top: 6px; }
+.confirm-block { border: 1px solid color-mix(in srgb, var(--danger) 32%, transparent); background: color-mix(in srgb, var(--danger) 8%, transparent); border-radius: 12px; padding: 13px 15px; margin-top: 14px; }
+.confirm-block.neutral { border-color: var(--line-strong); background: var(--surface-2); }
+.confirm-block p { font-size: 0.85rem; color: var(--ink-soft); }
+.confirm-block b { color: var(--ink); }
+.confirm-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+
+/* ---------- Layout scaffolding for this document ---------- */
+.page-wrap { max-width: 1180px; margin: 0 auto; padding: 0 20px 90px; }
+.doc-head { padding: 40px 0 30px; border-bottom: 1px solid var(--line); margin-bottom: 40px; display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+.doc-head h1 { font-size: clamp(1.8rem, 3.4vw, 2.4rem); max-width: 20ch; }
+.doc-head .lede { margin-top: 12px; color: var(--ink-soft); max-width: 64ch; font-size: 0.98rem; }
+.doc-head .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.frame-block { margin-bottom: 56px; }
+.frame-label { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.frame-label .fl-no { font-family: var(--font-display); font-size: 1.1rem; color: var(--muted); }
+.frame-label h2 { font-size: 1.2rem; }
+.frame-label .fl-note { font-size: 0.84rem; color: var(--muted); }
+.frame-shell { border-radius: var(--r-panel); box-shadow: var(--shadow-card); }
+.note { margin-top: 14px; padding: 12px 16px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line); font-size: 0.84rem; color: var(--ink-soft); }
+.note b { color: var(--ink); }
+.three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; align-items: start; }
+.closing-notes { margin-top: 60px; padding-top: 40px; border-top: 1px solid var(--line); }
+.closing-notes h2 { font-size: 1.5rem; }
+.closing-notes ul { margin: 18px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 32px; }
+.closing-notes li { font-size: 0.9rem; color: var(--ink-soft); padding: 10px 0; border-top: 1px solid var(--line); }
+.closing-notes li b { color: var(--ink); font-weight: 600; }
+
+/* ---------- Explicit mobile preview (fixed width, forced mobile rules) ---------- */
+.frame-mobile { width: 380px; max-width: 100%; }
+.frame-mobile .app-shell { display: block; border-radius: var(--r-panel); }
+.frame-mobile .app-sidebar { display: none; }
+.frame-mobile .app-topbar { display: flex; }
+.frame-mobile .app-content { padding: 18px 16px 28px; }
+.frame-mobile .proj-row { gap: 10px; }
+.frame-mobile .proj-bar-wrap { width: 100%; max-width: none; }
+.frame-mobile .proj-pct { text-align: left; }
+.frame-mobile .kanban { grid-template-columns: 1fr; }
+
+/* ---------- Real responsiveness for the whole document ---------- */
+@media (max-width: 860px) {
+  .app-shell { grid-template-columns: 1fr; }
+  .app-sidebar { display: none; }
+  .app-topbar { display: flex; }
+  .kanban { grid-template-columns: 1fr; }
+  .three-col { grid-template-columns: 1fr; }
+  .closing-notes ul { grid-template-columns: 1fr; }
+  .doc-head { padding-top: 24px; }
+  .proj-bar-wrap { width: 100%; max-width: none; }
+  .proj-pct { text-align: left; }
+}
+@media (max-width: 560px) {
+  .toolbar { flex-direction: column; align-items: stretch; }
+  .toolbar .spacer { display: none; }
+  .proj-detail-head { flex-direction: column; }
+  .pd-figure { text-align: left; }
+}
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <header class="doc-head">
+    <div>
+      <span class="label">Hi-fi design reference &middot; not shipped code</span>
+      <h1>Projects: list, board, dependencies</h1>
+      <p class="lede">
+        Built on <a class="textlink" href="tracker-wireframe.html">tracker-wireframe.html</a> (structure), <a class="textlink" href="PRD.md">PRD.md</a> REQ-06 and REQ-07 plus
+        <a class="textlink" href="SCHEMA.md">SCHEMA.md</a> (project status, progress from current tasks, dependencies with no self or cycle), and <a class="textlink" href="DESIGN.md">DESIGN.md</a>
+        (the "quiet ledger" identity already shipped on the landing page). List and board read one task source; tokens and components are copied from <code>globals.css</code>.
+      </p>
+      <div class="meta">
+        <span class="chip">Dial: ENERGY 2 / RHYTHM 2 / MOTION 1</span>
+        <span class="chip">Ref: Mobbin (Linear, Height boards)</span>
+        <span class="chip">Palette: 2 core + 1 accent (unchanged)</span>
+      </div>
+    </div>
+    <button class="icon-btn" id="theme-btn" type="button" aria-label="Switch to dark theme" title="Dark theme">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6.4 6.4 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+    </button>
+  </header>
+
+  <div class="note" style="margin-bottom:48px">
+    <b>How to read this file.</b> The theme toggle, the List / Board toggle on the project detail, the "New project" modal, a task detail
+    (with its blocking dependency), the "Archive project" confirmation, and the "Complete project" guard (which refuses while tasks are
+    unfinished) are real and keyboard-operable. Filter chips and the per-card status picker are shown as reference only, since Projects has
+    no backend yet (<a class="textlink" href="PLAN.md">PLAN.md</a>, M2). Every figure is synthetic and labelled "Sample data" (R-17).
+  </div>
+
+  <!-- ================= FRAME 1: PROJECT LIST ================= -->
+  <div class="frame-block">
+    <div class="frame-label">
+      <span class="fl-no">01</span>
+      <h2>Projects: the list</h2>
+      <span class="fl-note">Progress from current, non-archived tasks (REQ-06)</span>
+    </div>
+
+    <div class="frame-shell">
+      <div class="app-shell">
+        <aside class="app-sidebar">
+          <div class="app-brand-row">
+            <span class="brand"><span class="brand-mark"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Tracker</span>
+          </div>
+          <nav class="app-nav" aria-label="Primary">
+            <a class="app-nav-item" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 11 9-8 9 8"/><path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"/></svg>Dashboard</a>
+            <a class="app-nav-item" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-6"/><path d="m9 11 3 3L22 4"/></svg>Tasks</a>
+            <a class="app-nav-item" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>Habits</a>
+            <a class="app-nav-item" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Pomodoro</a>
+            <a class="app-nav-item is-active" href="#" aria-current="page"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 5v11"/><path d="M12 5v6"/><path d="M18 5v14"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg>Projects</a>
+            <a class="app-nav-item" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5"/><path d="M16 12h.01"/></svg>Finance<span class="app-nav-tag">Soon</span></a>
+          </nav>
+          <div class="app-sidebar-foot"><span class="app-avatar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg></span>Budi S.</div>
+        </aside>
+
+        <div class="app-main">
+          <div class="app-topbar">
+            <button class="icon-btn" type="button" aria-label="Open menu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+            <span class="app-topbar-title">Projects</span>
+          </div>
+
+          <main class="app-content">
+            <div class="page-head">
+              <h1>Projects</h1>
+              <span class="sample-tag">Sample data</span>
+            </div>
+
+            <div class="toolbar">
+              <span class="filter-chip">Status: Active <span class="care">&#9662;</span></span>
+              <span class="ref-only">Archived projects are hidden here by default; switch to Archived or All to see them.</span>
+              <span class="spacer"></span>
+              <button class="btn btn-primary btn-sm" type="button" data-open-modal="modal-new-project">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> New project
+              </button>
+            </div>
+
+            <div class="proj-list">
+              <div class="proj-row">
+                <div class="proj-main">
+                  <div class="proj-name">Q4 Launch <span class="chip">Active</span></div>
+                  <div class="proj-sub">7 of 12 tasks done <span aria-hidden="true">&middot;</span> 1 task blocked</div>
+                </div>
+                <div class="proj-bar-wrap">
+                  <div class="pbar"><i style="width:58%"></i></div>
+                  <div class="proj-pct tnum">58%</div>
+                </div>
+                <div class="proj-open"><a class="btn btn-sm" href="#frame-detail">Open</a></div>
+              </div>
+              <div class="proj-row">
+                <div class="proj-main">
+                  <div class="proj-name">Tracker MVP <span class="chip">Active</span></div>
+                  <div class="proj-sub">3 of 9 tasks done</div>
+                </div>
+                <div class="proj-bar-wrap">
+                  <div class="pbar"><i style="width:33%"></i></div>
+                  <div class="proj-pct tnum">33%</div>
+                </div>
+                <div class="proj-open"><a class="btn btn-sm" href="#frame-detail">Open</a></div>
+              </div>
+              <div class="proj-row">
+                <div class="proj-main">
+                  <div class="proj-name">Home Renovation <span class="chip">Active</span></div>
+                  <div class="proj-sub">No tasks yet</div>
+                </div>
+                <div class="proj-bar-wrap">
+                  <div class="pbar"><i class="is-empty"></i></div>
+                  <div class="proj-pct tnum">0%</div>
+                </div>
+                <div class="proj-open"><a class="btn btn-sm" href="#frame-detail">Open</a></div>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= FRAME 2: PROJECT DETAIL ================= -->
+  <div class="frame-block" id="frame-detail">
+    <div class="frame-label">
+      <span class="fl-no">02</span>
+      <h2>Project detail: one task source, two views</h2>
+      <span class="fl-note">/projects/:id &middot; List and Board are the same tasks (REQ-06, REQ-07)</span>
+    </div>
+
+    <div class="frame-shell">
+      <div class="app-shell">
+        <aside class="app-sidebar">
+          <div class="app-brand-row">
+            <span class="brand"><span class="brand-mark"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Tracker</span>
+          </div>
+          <nav class="app-nav" aria-label="Primary">
+            <a class="app-nav-item" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 11 9-8 9 8"/><path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"/></svg>Dashboard</a>
+            <a class="app-nav-item" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-6"/><path d="m9 11 3 3L22 4"/></svg>Tasks</a>
+            <a class="app-nav-item" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>Habits</a>
+            <a class="app-nav-item" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Pomodoro</a>
+            <a class="app-nav-item is-active" href="#" aria-current="page"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 5v11"/><path d="M12 5v6"/><path d="M18 5v14"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg>Projects</a>
+            <a class="app-nav-item" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5"/><path d="M16 12h.01"/></svg>Finance<span class="app-nav-tag">Soon</span></a>
+          </nav>
+          <div class="app-sidebar-foot"><span class="app-avatar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg></span>Budi S.</div>
+        </aside>
+
+        <div class="app-main">
+          <div class="app-topbar">
+            <button class="icon-btn" type="button" aria-label="Open menu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+            <span class="app-topbar-title">Q4 Launch</span>
+          </div>
+
+          <main class="app-content">
+            <a class="backlink" href="#frame-01-noop" onclick="return false"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg> Projects</a>
+
+            <div class="proj-detail-head">
+              <div>
+                <div class="pd-title">Q4 Launch <span class="chip">Active</span></div>
+                <div class="pd-sub tnum">7 of 12 tasks done <span aria-hidden="true">&middot;</span> 3 todo, 2 in progress</div>
+                <div class="proj-detail-actions" style="margin-top:14px">
+                  <button class="btn btn-sm" type="button" id="complete-btn">Complete project</button>
+                  <button class="btn btn-sm" type="button" data-open-modal="modal-archive">Archive</button>
+                  <span class="sample-tag">Sample data</span>
+                </div>
+              </div>
+              <div class="pd-figure">
+                <div class="pd-pct tnum">58%</div>
+                <div class="pd-caption">complete</div>
+              </div>
+            </div>
+
+            <div class="pd-bar"><div class="pbar"><i style="width:58%"></i></div></div>
+
+            <!-- Complete guard: refuses while tasks are unfinished (REQ-06) -->
+            <div class="confirm-block" id="complete-guard" hidden>
+              <p><b>This project can't be completed yet.</b> 5 tasks are still unfinished. Finish or archive them first, then mark Q4 Launch complete.</p>
+              <div class="confirm-actions">
+                <button class="btn btn-sm btn-quiet" type="button" id="complete-guard-dismiss">Got it</button>
+              </div>
+            </div>
+
+            <div class="blocked-banner">
+              <span class="bb-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+              <p><b>"Send to print"</b> can't be completed while <b>"Final design approval"</b> is still open. Finish that task, or remove the dependency, first.</p>
+            </div>
+
+            <div class="toolbar" style="margin-top:16px">
+              <div class="seg" role="tablist" aria-label="Task view">
+                <button role="tab" aria-selected="true" data-tab="board">Board</button>
+                <button role="tab" aria-selected="false" data-tab="list">List</button>
+              </div>
+              <span class="spacer"></span>
+              <button class="btn btn-sm" type="button" data-open-modal="modal-new-project" style="visibility:hidden" tabindex="-1" aria-hidden="true">x</button>
+              <button class="btn btn-primary btn-sm" type="button" data-open-modal="modal-task-detail">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Add task
+              </button>
+            </div>
+
+            <!-- BOARD PANEL -->
+            <div id="panel-board" data-panel>
+              <div class="kanban">
+                <div class="kan-col">
+                  <div class="kan-col-head"><span>Todo</span><span class="count-badge">3</span></div>
+                  <button class="kan-card" type="button" data-open-modal="modal-approval-detail">
+                    <span class="kc-title">Final design approval</span>
+                    <div class="kc-meta"><span class="chip">High</span></div>
+                    <div class="kc-move"><label class="field-hint" for="mv1">Move to</label>
+                      <select id="mv1"><option>Todo</option><option>In Progress</option><option>Done</option></select>
+                    </div>
+                  </button>
+                  <button class="kan-card" type="button">
+                    <span class="kc-title">Write launch email</span>
+                    <div class="kc-meta"><span class="chip">Medium</span></div>
+                  </button>
+                  <button class="kan-card" type="button">
+                    <span class="kc-title">Brief the sales team</span>
+                    <div class="kc-meta"><span class="chip">Low</span></div>
+                  </button>
+                </div>
+                <div class="kan-col">
+                  <div class="kan-col-head"><span>In Progress</span><span class="count-badge">2</span></div>
+                  <button class="kan-card" type="button" data-open-modal="modal-task-detail">
+                    <span class="kc-title">Send to print</span>
+                    <div class="kc-meta"><span class="chip">High</span><span class="chip-flag">Blocked</span></div>
+                    <div class="kc-move"><label class="field-hint" for="mv2">Move to</label>
+                      <select id="mv2"><option>Todo</option><option selected>In Progress</option><option disabled>Done (blocked)</option></select>
+                    </div>
+                  </button>
+                  <button class="kan-card" type="button">
+                    <span class="kc-title">Set up landing page</span>
+                    <div class="kc-meta"><span class="chip">Medium</span></div>
+                  </button>
+                </div>
+                <div class="kan-col">
+                  <div class="kan-col-head"><span>Done</span><span class="count-badge">7</span></div>
+                  <button class="kan-card is-done" type="button">
+                    <span class="kc-title">Venue booking</span>
+                    <div class="kc-meta"><span class="chip">Booked</span></div>
+                  </button>
+                  <button class="kan-card is-done" type="button">
+                    <span class="kc-title">Confirm keynote speaker</span>
+                  </button>
+                  <div class="kan-more">and 5 more done</div>
+                </div>
+              </div>
+              <p class="note">The per-card status picker is the keyboard alternative to dragging a card between columns (UX-FLOWS). Moving a blocked card to Done is disabled, and the reason is shown on the task, never a silent no-op.</p>
+            </div>
+
+            <!-- LIST PANEL -->
+            <div id="panel-list" data-panel hidden>
+              <div class="task-list">
+                <div class="task-row">
+                  <button class="chk-btn" aria-label="Mark Final design approval as done"></button>
+                  <button class="task-row-title" type="button" data-open-modal="modal-approval-detail">Final design approval</button>
+                  <div class="task-row-meta"><span class="chip">Todo</span><span class="chip">High</span></div>
+                </div>
+                <div class="task-row">
+                  <button class="chk-btn" disabled aria-label="Send to print is blocked and cannot be completed"></button>
+                  <button class="task-row-title" type="button" data-open-modal="modal-task-detail">Send to print</button>
+                  <div class="task-row-meta"><span class="chip">In Progress</span><span class="chip-flag">Blocked</span></div>
+                </div>
+                <div class="task-row">
+                  <button class="chk-btn" aria-label="Mark Set up landing page as done"></button>
+                  <button class="task-row-title" type="button">Set up landing page</button>
+                  <div class="task-row-meta"><span class="chip">In Progress</span><span class="chip">Medium</span></div>
+                </div>
+                <div class="task-row">
+                  <button class="chk-btn is-done" aria-label="Mark Venue booking as not done"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></button>
+                  <button class="task-row-title is-done" type="button">Venue booking</button>
+                  <div class="task-row-meta"><span class="chip">Done</span></div>
+                </div>
+              </div>
+              <p class="note">List and Board show the same tasks. A blocked task's checkbox is disabled here, with the blocker named in its detail, not hidden.</p>
+            </div>
+
+          </main>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= FRAME 3: STATES & VARIANTS ================= -->
+  <div class="frame-block">
+    <div class="frame-label">
+      <span class="fl-no">03</span>
+      <h2>States and the done / archived project</h2>
+      <span class="fl-note">R-27 empty &amp; loading; PRD: done and archived are independent</span>
+    </div>
+    <div class="three-col">
+      <div class="frame-shell" style="border:1px solid var(--line);border-radius:var(--r-panel);padding:8px;background:var(--surface)">
+        <div class="empty-state" style="margin:32px auto">
+          <span class="es-ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 5v11"/><path d="M12 5v6"/><path d="M18 5v14"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg></span>
+          <h3>No projects yet</h3>
+          <p>Group related tasks into a project to track progress and set dependencies between them.</p>
+          <button class="btn btn-primary" type="button" data-open-modal="modal-new-project">Create your first project</button>
+        </div>
+      </div>
+      <div class="frame-shell" style="border:1px solid var(--line);border-radius:var(--r-panel);padding:20px;background:var(--surface)">
+        <p class="field-hint" style="margin-bottom:4px">Loading projects&hellip;</p>
+        <div class="skeleton-row"></div>
+        <div class="skeleton-row"></div>
+        <div class="skeleton-row"></div>
+      </div>
+      <div class="frame-shell" style="border:1px solid var(--line);border-radius:var(--r-panel);padding:20px;background:var(--surface)">
+        <div class="proj-name" style="font-size:1.02rem">Legacy Website Migration</div>
+        <div class="detail-chips" style="margin-top:10px"><span class="chip">Done</span><span class="chip">Archived</span></div>
+        <div class="proj-sub tnum" style="margin-bottom:12px">5 of 5 tasks done</div>
+        <div class="pbar"><i style="width:100%"></i></div>
+        <div class="detail-actions" style="margin-top:16px"><button class="btn btn-sm" type="button">Reopen</button></div>
+        <p class="field-hint" style="margin-top:12px">Both chips can show at once. Reopening never auto-archives or auto-unarchives its tasks.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= FRAME 4: MOBILE ================= -->
+  <div class="frame-block">
+    <div class="frame-label">
+      <span class="fl-no">04</span>
+      <h2>Mobile: 380px</h2>
+      <span class="fl-note">Progress bar goes full width; board stacks to one column (R-03)</span>
+    </div>
+    <div class="frame-mobile frame-shell" style="border:1px solid var(--line);overflow:hidden">
+      <div class="app-shell">
+        <div class="app-main">
+          <div class="app-topbar">
+            <button class="icon-btn" type="button" aria-label="Open menu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+            <span class="app-topbar-title">Projects</span>
+          </div>
+          <main class="app-content">
+            <div class="page-head"><h1 style="font-size:1.35rem">Projects</h1><span class="sample-tag">Sample data</span></div>
+            <div class="proj-list" style="margin-top:0">
+              <div class="proj-row">
+                <div class="proj-main">
+                  <div class="proj-name">Q4 Launch <span class="chip">Active</span></div>
+                  <div class="proj-sub">7 of 12 tasks done</div>
+                </div>
+                <div class="proj-bar-wrap">
+                  <div class="pbar"><i style="width:58%"></i></div>
+                  <div class="proj-pct tnum">58%</div>
+                </div>
+              </div>
+              <div class="proj-row">
+                <div class="proj-main">
+                  <div class="proj-name">Tracker MVP <span class="chip">Active</span></div>
+                  <div class="proj-sub">3 of 9 tasks done</div>
+                </div>
+                <div class="proj-bar-wrap">
+                  <div class="pbar"><i style="width:33%"></i></div>
+                  <div class="proj-pct tnum">33%</div>
+                </div>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="closing-notes">
+    <h2>Reasoning, written down (R-31)</h2>
+    <ul>
+      <li><b>One big Fraunces number.</b> The detail's "58%" is the single editorial figure and the focal point, the same identity motif as the Finance total and the Tasks section markers; the list echoes it as small tabular percentages.</li>
+      <li><b>Green means done, nothing else.</b> Progress fill, the completed checkbox, and the primary action carry the one green accent. Status and priority chips stay plain, so completion is the only thing colour points at.</li>
+      <li><b>Blocked reuses the hatch, not a new red icon.</b> The same hatch flag marks Blocked here, Overdue on Tasks, and Over budget on Finance: one motif for "needs attention", so the vocabulary is learned once.</li>
+      <li><b>Board and List are one source.</b> The toggle swaps the view, not the data. A blocked task is disabled in both, and its blocker is named on the task, never silently dropped (REQ-07, UX-FLOWS).</li>
+      <li><b>Guards explain, they don't just disable.</b> "Complete project" opens a plain reason ("5 tasks unfinished") instead of a dead greyed button, matching the rule that completion is refused while tasks are open.</li>
+      <li><b>Archive is a confirmed, reversible move.</b> The dialog says it only hides the project from the active list and keeps every task and its history, matching archived_at as a separate attribute from done.</li>
+      <li><b>Empty is explained.</b> A project with no tasks reads "No tasks yet" at 0%, never an unlabelled empty bar (wireframe rule).</li>
+      <li><b>Two real routes, not invented tabs.</b> The list is /projects and the detail is /projects/:id; the sidebar points only at pages that exist (R-24).</li>
+    </ul>
+  </div>
+
+</div>
+
+<!-- ================= MODAL: NEW PROJECT ================= -->
+<div class="modal-scrim" id="modal-new-project" data-modal>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="np-title" tabindex="-1">
+    <div class="modal-head">
+      <h2 id="np-title">New project</h2>
+      <button class="icon-btn" type="button" aria-label="Close" data-close-modal>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form id="new-project-form" novalidate>
+      <div id="np-error" class="form-alert" role="alert" style="display:none;margin-bottom:14px">A project name is required.</div>
+      <div class="field" style="margin-bottom:14px">
+        <label for="np-name">Name <span style="color:var(--danger)">*</span></label>
+        <input class="input" id="np-name" maxlength="120" placeholder="e.g. Q4 Launch" />
+      </div>
+      <div class="field" style="margin-bottom:4px">
+        <label for="np-desc">Description (optional)</label>
+        <textarea class="input" id="np-desc" maxlength="5000" placeholder="What this project is for."></textarea>
+      </div>
+      <p class="field-hint" style="margin-top:10px">A new project starts Active with 0% progress. You add tasks to it from here or from Tasks.</p>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-quiet" data-close-modal>Cancel</button>
+        <button type="submit" class="btn btn-primary">Create project</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ================= MODAL: ARCHIVE PROJECT (confirm) ================= -->
+<div class="modal-scrim" id="modal-archive" data-modal>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="ar-title" tabindex="-1">
+    <div class="modal-head">
+      <h2 id="ar-title">Archive Q4 Launch?</h2>
+      <button class="icon-btn" type="button" aria-label="Close" data-close-modal>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <p class="detail-desc">It will be hidden from your active projects list. All its tasks and history are kept, and nothing is auto-archived. Switch the Status filter to Archived to find it again, then Reopen to bring it back.</p>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-quiet" data-close-modal>Cancel</button>
+      <button type="button" class="btn" data-close-modal>Archive project</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODAL: TASK DETAIL (BLOCKED) ================= -->
+<div class="modal-scrim" id="modal-task-detail" data-modal>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="td-title" tabindex="-1">
+    <div class="modal-head">
+      <h2 id="td-title">Send to print</h2>
+      <button class="icon-btn" type="button" aria-label="Close" data-close-modal>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="detail-chips">
+      <span class="chip">In Progress</span>
+      <span class="chip">High</span>
+      <span class="chip-flag">Blocked</span>
+      <span class="chip">Q4 Launch</span>
+    </div>
+    <p class="detail-desc">Final print files to the vendor. Waits on the design being signed off.</p>
+
+    <div class="detail-section">
+      <label>Dependencies (predecessors)</label>
+      <div id="dep-list">
+        <div class="dep-row">
+          <span class="dep-name">Final design approval (not done yet)</span>
+          <button class="btn btn-sm" type="button" data-remove-dep>Remove</button>
+        </div>
+      </div>
+      <p class="field-hint" style="margin-top:8px">Dependencies stay within this project. To move this task to another project, remove them first.</p>
+    </div>
+
+    <div class="detail-actions">
+      <button class="btn btn-primary" type="button" disabled aria-describedby="td-blocked">Mark done</button>
+      <button class="btn" type="button">Start Pomodoro</button>
+      <button class="btn" type="button">Archive</button>
+    </div>
+    <p class="blocked-hint" id="td-blocked">Blocked by: Final design approval (not done yet)</p>
+  </div>
+</div>
+
+<!-- ================= MODAL: TASK DETAIL (the predecessor, unblocked) ================= -->
+<div class="modal-scrim" id="modal-approval-detail" data-modal>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="ad-title" tabindex="-1">
+    <div class="modal-head">
+      <h2 id="ad-title">Final design approval</h2>
+      <button class="icon-btn" type="button" aria-label="Close" data-close-modal>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="detail-chips"><span class="chip">Todo</span><span class="chip">High</span><span class="chip">Q4 Launch</span></div>
+    <p class="detail-desc">Sign-off on the final artwork. One task depends on this: "Send to print" unblocks the moment this is done.</p>
+    <div class="detail-section">
+      <label>History</label>
+      <div class="detail-hist-row"><span class="dh-k">Created</span><span class="tnum">2 Sep 2026</span></div>
+      <div class="detail-hist-row"><span class="dh-k">Status &rarr; In Progress</span><span class="tnum">9 Sep 2026</span></div>
+    </div>
+    <div class="detail-actions">
+      <button class="btn btn-primary" type="button">Mark done</button>
+      <button class="btn" type="button">Start Pomodoro</button>
+      <button class="btn" type="button">Archive</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // Theme toggle — same mechanism as ThemeToggle.tsx (data-theme on <html>).
+  var themeBtn = document.getElementById("theme-btn");
+  var sunPath = '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>';
+  var moonPath = '<path d="M12 3a6.4 6.4 0 0 0 9 9 9 9 0 1 1-9-9Z"/>';
+  themeBtn.addEventListener("click", function () {
+    var next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    themeBtn.setAttribute("aria-label", next === "dark" ? "Switch to light theme" : "Switch to dark theme");
+    themeBtn.querySelector("svg").innerHTML = next === "dark" ? sunPath : moonPath;
+  });
+
+  // Board / List toggle on the project detail.
+  var tabs = document.querySelectorAll('[role="tab"][data-tab]');
+  tabs.forEach(function (tab) {
+    tab.addEventListener("click", function () {
+      tabs.forEach(function (t) { t.setAttribute("aria-selected", String(t === tab)); });
+      document.querySelectorAll("[data-panel]").forEach(function (p) {
+        p.hidden = p.id !== "panel-" + tab.dataset.tab;
+      });
+    });
+  });
+
+  // Modals with a focus trap (Tab cycles inside the open dialog; Escape closes).
+  var lastTrigger = null;
+  var FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  function openModal(id) {
+    var m = document.getElementById(id);
+    if (!m) return;
+    lastTrigger = document.activeElement;
+    m.classList.add("is-open");
+    document.body.style.overflow = "hidden";
+    m.querySelector(".modal-panel").focus();
+  }
+  function closeModal(m) {
+    m.classList.remove("is-open");
+    document.body.style.overflow = "";
+    if (lastTrigger && typeof lastTrigger.focus === "function") lastTrigger.focus();
+  }
+  document.querySelectorAll("[data-open-modal]").forEach(function (btn) {
+    btn.addEventListener("click", function () { openModal(btn.dataset.openModal); });
+  });
+  document.querySelectorAll("[data-modal]").forEach(function (m) {
+    m.addEventListener("mousedown", function (e) { if (e.target === m) closeModal(m); });
+    m.querySelectorAll("[data-close-modal]").forEach(function (btn) {
+      btn.addEventListener("click", function () { closeModal(m); });
+    });
+  });
+  document.addEventListener("keydown", function (e) {
+    var open = document.querySelector(".modal-scrim.is-open");
+    if (!open) return;
+    if (e.key === "Escape") { closeModal(open); return; }
+    if (e.key === "Tab") {
+      var items = Array.prototype.filter.call(open.querySelectorAll(FOCUSABLE), function (el) { return el.offsetParent !== null; });
+      if (!items.length) return;
+      var first = items[0], last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+  });
+
+  // New project: name required.
+  var npForm = document.getElementById("new-project-form");
+  npForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var name = document.getElementById("np-name");
+    var err = document.getElementById("np-error");
+    if (!name.value.trim()) {
+      err.style.display = "block";
+      name.setAttribute("aria-invalid", "true");
+      name.focus();
+      return;
+    }
+    err.style.display = "none";
+    name.removeAttribute("aria-invalid");
+    closeModal(document.getElementById("modal-new-project"));
+    npForm.reset();
+  });
+
+  // Complete project guard: reveal the reason it is refused.
+  var completeBtn = document.getElementById("complete-btn");
+  var guard = document.getElementById("complete-guard");
+  completeBtn.addEventListener("click", function () {
+    guard.hidden = false;
+    guard.scrollIntoView({ block: "nearest" });
+    document.getElementById("complete-guard-dismiss").focus();
+  });
+  document.getElementById("complete-guard-dismiss").addEventListener("click", function () {
+    guard.hidden = true;
+    completeBtn.focus();
+  });
+
+  // Remove a dependency row (real, local-only interaction).
+  document.querySelectorAll("[data-remove-dep]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      btn.closest(".dep-row").remove();
+    });
+  });
+})();
+</script>
+</body>
+</html>

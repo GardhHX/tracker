@@ -1,0 +1,1327 @@
+<title>Tracker Wireframe Kit</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --bg:#F3F3F0; --surface:#FFFFFF; --surface-2:#FAFAF8;
+    --ink:#17181A; --ink-soft:#53565C; --muted:#83868C; --line:#DBDAD4;
+    --accent:#2F55D4; --accent-ink:#1E3AA0; --accent-soft:#EAEEFB;
+    --shadow: 0 1px 2px rgba(20,20,15,.06);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#141517; --surface:#1C1D20; --surface-2:#212226;
+      --ink:#F1F1EC; --ink-soft:#C6C8CC; --muted:#8F9095; --line:#35373C;
+      --accent:#87A6FF; --accent-ink:#B6C7FF; --accent-soft:#1D2438;
+      --shadow: 0 1px 2px rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#141517; --surface:#1C1D20; --surface-2:#212226;
+    --ink:#F1F1EC; --ink-soft:#C6C8CC; --muted:#8F9095; --line:#35373C;
+    --accent:#87A6FF; --accent-ink:#B6C7FF; --accent-soft:#1D2438;
+    --shadow: 0 1px 2px rgba(0,0,0,.4);
+  }
+  @media (prefers-reduced-motion: reduce){ *{ transition:none !important; scroll-behavior:auto !important; } }
+
+  *{ box-sizing:border-box; }
+  body{ background:var(--bg); color:var(--ink); font-family:"IBM Plex Sans",system-ui,sans-serif; padding:0 20px; padding-block:0; }
+  .wrap{ max-width:1280px; margin:0 auto; }
+  h1,h2,h3,h4{ font-family:"IBM Plex Sans",system-ui,sans-serif; text-wrap:balance; margin:0; }
+  a{ color:var(--accent-ink); }
+  a:hover{ color:var(--accent); }
+  code, .mono{ font-family:"IBM Plex Mono",ui-monospace,monospace; }
+  :focus-visible{ outline:2px solid var(--accent); outline-offset:2px; border-radius:2px; }
+
+  /* ---------- page chrome ---------- */
+  .top{ padding:36px 0 22px; border-bottom:1px solid var(--line); }
+  .top-kicker{ display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
+  .badge-mode{ font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.04em; background:var(--ink); color:var(--surface); padding:4px 9px; border-radius:4px; }
+  .badge-ver{ font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--muted); border:1px solid var(--line); padding:3px 8px; border-radius:4px; }
+  .top h1{ font-size:clamp(28px,4vw,40px); font-weight:700; letter-spacing:-.01em; }
+  .top p.lede{ max-width:66ch; color:var(--ink-soft); font-size:15px; line-height:1.6; margin-top:12px; }
+  .top .refs{ margin-top:14px; font-size:12.5px; color:var(--muted); }
+  .top .refs code{ background:var(--surface-2); border:1px solid var(--line); padding:1px 5px; border-radius:3px; }
+
+  .legend{ display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:14px; margin:22px 0 0; padding:16px; background:var(--surface); border:1px solid var(--line); border-radius:8px; }
+  .legend h4{ font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-bottom:8px; font-weight:600; }
+  .legend-item{ display:flex; align-items:center; gap:9px; font-size:13px; color:var(--ink-soft); margin-bottom:7px; }
+  .legend-swatch{ flex:0 0 auto; }
+
+  .layout{ display:grid; grid-template-columns:200px 1fr; gap:36px; padding:32px 0 80px; align-items:start; }
+  .layout > main{ min-width:0; }
+  @media (max-width:820px){ .layout{ grid-template-columns:1fr; } .toc{ position:static !important; } }
+
+  .toc{ position:sticky; top:20px; align-self:start; }
+  .toc-title{ font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); font-weight:600; margin-bottom:10px; }
+  .toc ol{ list-style:none; margin:0; padding:0; border-left:1px solid var(--line); }
+  .toc li{ margin:0; }
+  .toc a{ display:block; padding:6px 0 6px 14px; font-size:13px; color:var(--ink-soft); text-decoration:none; border-left:2px solid transparent; margin-left:-1px; }
+  .toc a:hover{ color:var(--ink); border-left-color:var(--line); }
+  .toc a:focus-visible{ outline-offset:-2px; }
+
+  section.screen{ scroll-margin-top:20px; padding-top:8px; margin-bottom:64px; border-top:1px solid var(--line); padding-top:32px; }
+  section.screen:first-of-type{ border-top:none; }
+  .screen-head{ display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:6px; }
+  .screen-head h2{ font-size:22px; font-weight:700; }
+  .route-chip{ font-family:"IBM Plex Mono",monospace; font-size:11.5px; background:var(--surface-2); border:1px solid var(--line); padding:2px 7px; border-radius:4px; color:var(--ink-soft); }
+  .screen-purpose{ color:var(--ink-soft); font-size:14px; max-width:74ch; line-height:1.55; margin:8px 0 20px; }
+
+  .frame-holder{ margin-bottom:14px; max-width:100%; overflow-x:auto; padding-bottom:4px; }
+  .frame-holder-label{ font-size:11px; color:var(--muted); margin-bottom:6px; font-family:"IBM Plex Mono",monospace; }
+
+  /* ---------- annotation callouts ---------- */
+  .annot{ background:var(--accent-soft); border-left:3px solid var(--accent); border-radius:0 6px 6px 0; padding:12px 16px; margin-top:14px; }
+  .annot h5{ font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--accent-ink); font-weight:600; margin:0 0 7px; }
+  .annot ul{ margin:0; padding-left:18px; }
+  .annot li{ font-size:13px; color:var(--ink); line-height:1.55; margin-bottom:4px; }
+  .annot li:last-child{ margin-bottom:0; }
+  .annot .states{ margin-top:8px; padding-top:8px; border-top:1px solid rgba(47,85,212,.18); }
+
+  /* ================= WIREFRAME FRAME (fixed light, theme-independent) ================= */
+  .frame{
+    container-type: inline-size;
+    background:#FFFFFF; border:1px solid #C7C7C2; border-radius:6px;
+    overflow:auto; resize:horizontal; min-width:320px; max-width:100%;
+    box-shadow:var(--shadow); position:relative; color:#1A1A1A;
+    font-family:-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  .frame-fixed{ resize:none; overflow:hidden; }
+  .frame-readout{ position:sticky; float:right; top:6px; right:6px; margin:6px; font-family:"IBM Plex Mono",monospace; font-size:10.5px; background:var(--accent); color:#fff; padding:2px 7px; border-radius:4px; z-index:5; pointer-events:none; }
+  .frame-drag-hint{ position:absolute; bottom:2px; right:2px; width:12px; height:12px; z-index:4; pointer-events:none; opacity:.35; }
+
+  .app-shell{ display:grid; grid-template-columns:190px 1fr; min-height:520px; }
+  .app-sidebar{ background:#F7F7F4; border-right:1px solid #DDDBD2; padding:16px 14px; display:flex; flex-direction:column; gap:2px; }
+  .brand-mark{ display:flex; align-items:center; gap:8px; margin-bottom:18px; }
+  .brand-mark .sq{ width:16px; height:16px; background:#1A1A1A; border-radius:3px; }
+  .brand-mark span{ font-weight:600; font-size:14px; }
+  .nav-item{ display:flex; align-items:center; gap:9px; padding:7px 8px; border-radius:5px; font-size:13px; color:#4A4A46; cursor:default; }
+  .nav-item .dot{ width:6px; height:6px; border:1.4px solid #9A9A92; border-radius:1px; flex:0 0 auto; }
+  .nav-item.active{ background:#ECEBE5; color:#111; font-weight:600; }
+  .nav-item.active .dot{ background:#1A1A1A; border-color:#1A1A1A; }
+  .nav-foot{ margin-top:auto; padding-top:12px; border-top:1px solid #DDDBD2; display:flex; align-items:center; gap:8px; font-size:12px; color:#6B6B65; }
+  .nav-caret{ width:0; height:0; margin-left:auto; border-left:4px solid transparent; border-right:4px solid transparent; border-top:5px solid #8A8A82; }
+  .avatar-ph{ width:22px; height:22px; border-radius:50%; border:1.4px dashed #B7B6AE; flex:0 0 auto; }
+
+  .app-topbar{ display:none; align-items:center; gap:12px; padding:10px 16px; border-bottom:1px solid #DDDBD2; background:#F7F7F4; }
+  .burger{ width:20px; height:14px; position:relative; flex:0 0 auto; }
+  .burger span{ position:absolute; left:0; right:0; height:2px; background:#1A1A1A; }
+  .burger span:nth-child(1){ top:0; } .burger span:nth-child(2){ top:6px; } .burger span:nth-child(3){ top:12px; }
+  .app-topbar-title{ font-size:13.5px; font-weight:600; }
+
+  .app-content{ padding:22px 24px; }
+  .page-head{ display:flex; align-items:center; gap:10px; margin-bottom:18px; flex-wrap:wrap; }
+  .page-head h3{ font-size:19px; font-weight:700; color:#111; }
+  .page-head .route-chip{ background:#F1F0EA; }
+
+  @container (max-width: 660px){
+    .app-shell{ grid-template-columns:1fr; }
+    .app-sidebar{ display:none; }
+    .app-topbar{ display:flex; }
+    .app-content{ padding:16px 14px; }
+  }
+
+  .tag-sample{ font-family:"IBM Plex Mono",monospace; font-size:10px; color:#8A8A82; border:1px dashed #C6C5BC; padding:1px 6px; border-radius:3px; margin-left:8px; }
+
+  .grid-cards{ display:grid; grid-template-columns:repeat(2,1fr); gap:14px; }
+  @container (max-width: 660px){ .grid-cards{ grid-template-columns:1fr; } }
+  .grid-cards .span-2{ grid-column:span 2; }
+  @container (max-width: 660px){ .grid-cards .span-2{ grid-column:span 1; } }
+
+  .wf-card{ border:1px solid #DFDED7; border-radius:6px; padding:14px; background:#FEFEFD; }
+  .wf-card-head{ display:flex; justify-content:space-between; align-items:center; font-size:13px; font-weight:600; color:#222; margin-bottom:10px; }
+  .wf-link{ font-size:12px; font-weight:500; color:#4A4A46; text-decoration:none; border-bottom:1px dashed #9A9A92; }
+
+  .wf-row{ display:flex; align-items:center; gap:10px; padding:7px 0; border-bottom:1px solid #EEEDE7; flex-wrap:wrap; }
+  .wf-row:last-child{ border-bottom:none; }
+  .wf-check{ width:15px; height:15px; border:1.6px solid #9A9A92; border-radius:50%; flex:0 0 auto; }
+  .wf-check.is-done{ background:#1A1A1A; border-color:#1A1A1A; }
+  .wf-row-title{ font-size:13px; color:#1c1c1a; flex:1 1 140px; min-width:0; }
+  .wf-meta{ font-size:11.5px; color:#7A7A72; white-space:nowrap; }
+  .wf-row.is-overdue .wf-meta{ color:#111; font-weight:700; text-decoration:underline wavy #B7B6AE; }
+
+  .chip{ font-size:10.5px; padding:2px 7px; border-radius:4px; border:1px solid #C9C8C0; color:#4A4A46; white-space:nowrap; background:#F5F4EF; }
+  .chip.solid{ background:#1A1A1A; color:#fff; border-color:#1A1A1A; }
+  .chip.hatch{ background-image:repeating-linear-gradient(45deg,#1A1A1A 0,#1A1A1A 1.5px,transparent 1.5px,transparent 6px); background-color:#F5F4EF; border-color:#1A1A1A; font-weight:600; }
+  .chip.outline-dash{ border-style:dashed; }
+
+  .wf-btn{ font-size:12px; font-weight:600; padding:7px 13px; border-radius:5px; border:1.4px solid #1A1A1A; background:#fff; color:#1A1A1A; cursor:default; white-space:nowrap; }
+  .wf-btn.primary{ background:#1A1A1A; color:#fff; }
+  .wf-btn.sm{ padding:5px 10px; font-size:11px; }
+  .wf-btn.ghost{ border-color:transparent; padding:5px 4px; }
+  .wf-actions{ display:flex; gap:8px; margin-left:auto; }
+
+  .wf-kv{ display:flex; justify-content:space-between; font-size:13px; padding:4px 0; color:#3A3A36; }
+  .wf-kv strong{ font-variant-numeric:tabular-nums; font-size:14px; color:#111; }
+  .wf-placeholder{ border:1.5px dashed #C6C5BC; border-radius:5px; display:flex; align-items:center; justify-content:center; color:#9A9A92; font-size:11.5px; margin-top:8px; text-align:center; padding:8px; }
+  .wf-placeholder.small{ height:56px; }
+  .wf-placeholder.tall{ height:150px; }
+
+  .wf-pomo-mini{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+
+  .timebox{ display:flex; flex-direction:column; border-left:2px solid #DFDED7; margin:4px 0 4px 6px; }
+  .tb-row{ display:flex; gap:14px; padding:9px 0 9px 16px; position:relative; }
+  .tb-row:not(:last-child){ border-bottom:1px solid #F0EFEA; }
+  .tb-row::before{ content:""; position:absolute; left:-5px; top:13px; width:8px; height:8px; border-radius:50%; background:#1A1A1A; border:2px solid #FEFEFD; }
+  .tb-time{ flex:0 0 92px; font-family:"IBM Plex Mono",monospace; font-size:11px; color:#7A7A72; padding-top:2px; }
+  .tb-block{ flex:1 1 140px; font-size:13px; color:#1c1c1a; display:flex; align-items:center; gap:8px; flex-wrap:wrap; min-width:0; }
+
+  .toolbar{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid #E7E6E0; }
+  .toolbar .seg{ display:flex; border:1.4px solid #1A1A1A; border-radius:6px; overflow:hidden; }
+  .toolbar .seg button{ font-size:12px; font-weight:600; padding:6px 12px; border:none; background:#fff; color:#1A1A1A; cursor:default; }
+  .toolbar .seg button.on{ background:#1A1A1A; color:#fff; }
+  .filter-chip{ font-size:12px; padding:6px 11px; border:1px solid #C9C8C0; border-radius:5px; color:#4A4A46; display:flex; align-items:center; gap:5px; background:#fff; }
+  .filter-chip .care{ font-size:9px; }
+  .spacer{ flex:1 1 auto; }
+  @container (max-width: 660px){ .toolbar{ flex-wrap:wrap; } .toolbar .spacer{ display:none; } }
+
+  .kanban{ display:grid; grid-template-columns:repeat(3,minmax(180px,1fr)); gap:12px; overflow-x:auto; }
+  @container (max-width: 660px){ .kanban{ grid-auto-flow:column; grid-template-columns:none; grid-auto-columns:78%; } }
+  .kan-col{ background:#F7F7F4; border:1px solid #E1E0D9; border-radius:6px; padding:10px; min-width:0; }
+  .kan-col-head{ display:flex; justify-content:space-between; font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; color:#5C5C56; margin-bottom:9px; }
+  .kan-card{ background:#fff; border:1px solid #E1E0D9; border-radius:5px; padding:9px 10px; margin-bottom:8px; font-size:12.5px; }
+  .kan-card .t{ margin-bottom:6px; color:#1c1c1a; }
+  .kan-card .m{ display:flex; gap:6px; flex-wrap:wrap; }
+
+  .wf-table{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  .wf-table th{ text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; color:#7A7A72; font-weight:600; padding:0 10px 8px 0; border-bottom:1px solid #DFDED7; }
+  .wf-table td{ padding:9px 10px 9px 0; border-bottom:1px solid #EEEDE7; vertical-align:middle; color:#232320; }
+  .wf-amount{ font-variant-numeric:tabular-nums; font-weight:600; text-align:right; white-space:nowrap; }
+  .table-scroll{ overflow-x:auto; }
+  .table-scroll .wf-table{ min-width:640px; }
+
+  .side-panel{ border:1px solid #DFDED7; border-radius:6px; padding:14px; background:#F9F9F6; }
+  .field{ margin-bottom:11px; }
+  .field label{ display:block; font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; color:#7A7A72; margin-bottom:4px; }
+  .field .box{ border:1px solid #C9C8C0; border-radius:5px; padding:8px 10px; font-size:12.5px; color:#8A8A82; background:#fff; }
+
+  .habit-dots{ display:flex; gap:4px; }
+  .habit-dot{ width:16px; height:16px; border:1.4px solid #9A9A92; border-radius:3px; font-size:8px; display:flex; align-items:center; justify-content:center; color:#7A7A72; }
+  .habit-dot.on{ background:#1A1A1A; border-color:#1A1A1A; color:#fff; }
+  .habit-dot.off-schedule{ border-style:dashed; border-color:#D6D5CD; color:#C6C5BC; }
+
+  .timer-circle{ display:flex; flex-direction:column; align-items:center; gap:14px; padding:30px 10px; }
+  .bignum{ font-family:"IBM Plex Mono",monospace; font-size:42px; font-weight:600; letter-spacing:-.01em; }
+
+  .progress{ height:8px; border-radius:5px; background:#EEEDE7; border:1px solid #DFDED7; overflow:hidden; }
+  .progress > i{ display:block; height:100%; background:#1A1A1A; }
+  .progress.hatch > i{ background-image:repeating-linear-gradient(45deg,#1A1A1A 0,#1A1A1A 1.5px,transparent 1.5px,transparent 6px); }
+
+  /* states pattern grid */
+  .states-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; }
+  .state-card{ border:1px solid var(--line); background:var(--surface); border-radius:6px; padding:13px; }
+  .state-card h5{ font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin-bottom:8px; font-weight:700; }
+  .state-mini{ border:1px solid #DFDED7; border-radius:5px; background:#fff; padding:10px; font-size:11.5px; color:#5C5C56; min-height:64px; }
+  .state-mini .skel{ height:9px; background:#ECEBE5; border-radius:3px; margin-bottom:6px; }
+  .state-mini .skel:nth-child(2){ width:70%; }
+  .state-desc{ font-size:12px; color:var(--ink-soft); margin-top:8px; line-height:1.5; }
+
+  /* responsive demo section */
+  .resp-row{ display:flex; gap:18px; align-items:flex-start; flex-wrap:wrap; max-width:100%; overflow-x:auto; padding-bottom:4px; }
+  .resp-col{ flex:0 0 auto; }
+  .resp-col-label{ font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--muted); margin-bottom:6px; }
+
+  /* auth mini */
+  .auth-row{ display:flex; gap:16px; flex-wrap:wrap; }
+  .auth-card{ width:260px; background:#FEFEFD; border:1px solid #DFDED7; border-radius:8px; padding:20px 18px; }
+  .auth-card .al{ font-size:13px; font-weight:700; margin-bottom:14px; }
+  .auth-card .field .box{ padding:7px 9px; font-size:11.5px; }
+  .auth-card .wf-btn{ width:100%; margin-top:6px; text-align:center; }
+  .impl-badge{ font-size:10px; color:var(--muted); border:1px dashed var(--line); border-radius:4px; padding:2px 6px; margin-left:8px; }
+
+  /* sitemap */
+  .sitemap{ display:flex; gap:0; overflow-x:auto; padding:8px 2px 18px; }
+  .sm-col{ flex:0 0 168px; padding:0 16px; position:relative; }
+  .sm-col:not(:last-child)::after{ content:"→"; position:absolute; right:-4px; top:38px; color:var(--muted); font-size:16px; }
+  .sm-col-title{ font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); font-weight:700; margin-bottom:10px; height:26px; }
+  .sm-node{ font-family:"IBM Plex Mono",monospace; font-size:11px; background:var(--surface); border:1px solid var(--line); border-radius:5px; padding:7px 9px; margin-bottom:8px; color:var(--ink-soft); }
+
+  footer.decisions{ border-top:1px solid var(--line); padding:34px 0 60px; }
+  footer.decisions h3{ font-size:16px; margin-bottom:14px; }
+  footer.decisions ol{ padding-left:20px; margin:0; }
+  footer.decisions li{ font-size:13px; color:var(--ink-soft); margin-bottom:9px; line-height:1.55; }
+  footer.decisions strong{ color:var(--ink); }
+</style>
+
+<div class="wrap">
+  <div class="top">
+    <div class="top-kicker">
+      <span class="badge-mode">WIREFRAME: STRUCTURE, NOT FINAL VISUAL DESIGN</span>
+      <span class="badge-ver">v0.1 · 16 Sep 2026</span>
+    </div>
+    <h1>Tracker: Wireframe Start to Finish</h1>
+    <p class="lede">A wireframe set for the core routes in <code>UX-FLOWS.md</code>: from authentication to settings. Fidelity is deliberately low and grayscale. Layout, components, and interaction rules follow PRD/UX-FLOWS, without yet using the palette or typography from DESIGN.md. Pattern references were pulled from real apps on Mobbin (kanban, finance ledger, habit streaks, focus timer), not copied form-for-form.</p>
+    <p class="refs">Sources: <code>PRD.md</code> · <code>UX-FLOWS.md</code> · <code>DECISIONS.md</code> · <code>DESIGN.md</code>. All amounts and task/project names below are <strong>sample data</strong>.</p>
+
+    <div class="legend">
+      <div>
+        <h4>How to read a frame</h4>
+        <div class="legend-item"><span class="legend-swatch"><span class="wf-btn primary sm" style="pointer-events:none">Action</span></span> Solid button = primary action on the page</div>
+        <div class="legend-item"><span class="legend-swatch"><span class="wf-btn sm" style="pointer-events:none">Action</span></span> Outline button = secondary action</div>
+        <div class="legend-item"><span class="legend-swatch"><span class="wf-placeholder small" style="width:44px;height:22px;margin:0">▤</span></span> Dashed box = chart/image/avatar slot</div>
+      </div>
+      <div>
+        <h4>Status markers (not color)</h4>
+        <div class="legend-item"><span class="legend-swatch"><span class="chip">Active</span></span> Text chip for general status</div>
+        <div class="legend-item"><span class="legend-swatch"><span class="chip hatch">Overdue</span></span> Hatch pattern = needs attention (stands in for red)</div>
+        <div class="legend-item"><span class="legend-swatch"><span class="wf-check is-done" style="display:inline-block;vertical-align:middle"></span></span> Filled circle = done/checked</div>
+      </div>
+      <div>
+        <h4>Annotations</h4>
+        <div class="legend-item">The blue block below each frame is an interaction/business-rule note, not part of the visual design.</div>
+        <div class="legend-item">Drag the bottom-right corner of any frame to test reflow at 1440 → 768 → 360 px, matching the test thresholds in UX-FLOWS.</div>
+      </div>
+      <div>
+        <h4>Deliberate limits</h4>
+        <div class="legend-item">Elements inside a frame are static illustrations, not working controls. Their behavior is described in the annotation text, not coded here.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="layout">
+    <nav class="toc" aria-label="Wireframe navigation">
+      <div class="toc-title">Jump to</div>
+      <ol>
+        <li><a href="#sitemap">Flow map</a></li>
+        <li><a href="#auth">Authentication</a></li>
+        <li><a href="#today">Dashboard</a></li>
+        <li><a href="#tasks">Tasks</a></li>
+        <li><a href="#habits">Habits</a></li>
+        <li><a href="#pomodoro">Pomodoro</a></li>
+        <li><a href="#projects">Projects</a></li>
+        <li><a href="#fin-accounts">Accounts &amp; Categories</a></li>
+        <li><a href="#fin-tx">Transactions</a></li>
+        <li><a href="#fin-budget">Budgets</a></li>
+        <li><a href="#settings">Settings</a></li>
+        <li><a href="#states">State patterns</a></li>
+        <li><a href="#responsive">Responsive test</a></li>
+      </ol>
+    </nav>
+
+    <main>
+      <!-- ================= SITEMAP ================= -->
+      <section class="screen" id="sitemap">
+        <div class="screen-head"><h2>Flow Map</h2></div>
+        <p class="screen-purpose">Module order follows the page-structure table in UX-FLOWS.md: public → authentication → daily core → projects → finance → cross-module.</p>
+        <div class="sitemap">
+          <div class="sm-col">
+            <div class="sm-col-title">Public</div>
+            <div class="sm-node">/ (landing)</div>
+            <div class="sm-node">/privacy</div>
+          </div>
+          <div class="sm-col">
+            <div class="sm-col-title">Authentication</div>
+            <div class="sm-node">/login</div>
+            <div class="sm-node">/register</div>
+            <div class="sm-node">/verify-email</div>
+            <div class="sm-node">/forgot-password</div>
+            <div class="sm-node">/reset-password</div>
+          </div>
+          <div class="sm-col">
+            <div class="sm-col-title">Daily core</div>
+            <div class="sm-node">/dashboard</div>
+            <div class="sm-node">/tasks</div>
+            <div class="sm-node">/habits</div>
+            <div class="sm-node">/pomodoro</div>
+          </div>
+          <div class="sm-col">
+            <div class="sm-col-title">Projects</div>
+            <div class="sm-node">/projects</div>
+            <div class="sm-node">/projects/:id</div>
+          </div>
+          <div class="sm-col">
+            <div class="sm-col-title">Finance</div>
+            <div class="sm-node">/finance/accounts</div>
+            <div class="sm-node">/finance/categories</div>
+            <div class="sm-node">/finance/transactions</div>
+            <div class="sm-node">/finance/budgets</div>
+          </div>
+          <div class="sm-col">
+            <div class="sm-col-title">Cross-module</div>
+            <div class="sm-node">/settings</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= AUTH ================= -->
+      <section class="screen" id="auth">
+        <div class="screen-head"><h2>Authentication &amp; Profile</h2><span class="impl-badge">already implemented (summarized for flow context)</span></div>
+        <p class="screen-purpose">REQ-01/REQ-17. Shown briefly since the landing page and account UI already exist in code (<code>src/app/login</code>, etc.); this wireframe focuses on the modules not yet built.</p>
+        <div class="auth-row">
+          <div class="auth-card">
+            <div class="al">Log in <span class="route-chip" style="font-size:10px">/login</span></div>
+            <div class="field"><label>Email</label><div class="box">name@email.com</div></div>
+            <div class="field"><label>Password</label><div class="box">••••••••</div></div>
+            <button class="wf-btn primary">Log in</button>
+            <button class="wf-btn" style="margin-top:8px">Continue with Google</button>
+          </div>
+          <div class="auth-card">
+            <div class="al">Sign up <span class="route-chip" style="font-size:10px">/register</span></div>
+            <div class="field"><label>Name</label><div class="box">Full name</div></div>
+            <div class="field"><label>Email</label><div class="box">name@email.com</div></div>
+            <div class="field"><label>Password</label><div class="box">••••••••</div></div>
+            <button class="wf-btn primary">Create account</button>
+          </div>
+          <div class="auth-card">
+            <div class="al">Forgot password <span class="route-chip" style="font-size:10px">/forgot-password</span></div>
+            <div class="field"><label>Email</label><div class="box">name@email.com</div></div>
+            <button class="wf-btn primary">Send reset link</button>
+            <div class="state-desc">Same result message whether or not the account exists (doesn't leak account existence).</div>
+          </div>
+        </div>
+        <div class="annot">
+          <h5>Flow notes</h5>
+          <ul>
+            <li>An unverified session may only access verification, resend, logout, and a minimal read-only profile.</li>
+            <li>Google with an email already used by another method: direct the user to log in with the old method and link Google from Settings. Never merged automatically.</li>
+            <li>An expired/used token shows a "request a new link" action.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ================= TODAY ================= -->
+      <section class="screen" id="today">
+        <div class="screen-head"><h2>Dashboard</h2><span class="route-chip">/dashboard</span></div>
+        <p class="screen-purpose">REQ-18. Cross-module summary, led by a Timebox of today's scheduled Class/Task/Habit/Focus blocks, plus a few Tasks, Habits, and the Pomodoro status (not the full lists). Never shows finance details.</p>
+        <div class="frame-holder">
+          <div class="frame-holder-label">↔ drag to test width</div>
+          <div id="slot-today-main"></div>
+        </div>
+        <div class="frame-holder">
+          <div class="frame-holder-label">Add timebox form</div>
+          <div class="frame frame-fixed" style="width:300px">
+            <div class="side-panel" style="border:none;border-radius:0">
+              <div style="font-weight:700;font-size:13px;margin-bottom:10px">Add timebox</div>
+              <div class="field"><label>Kind</label><div class="box">Class</div></div>
+              <div class="field"><label>Title</label><div class="box">Database Systems Lab</div></div>
+              <div class="field"><label>Start</label><div class="box">13:00</div></div>
+              <div class="field"><label>End</label><div class="box">14:30</div></div>
+              <div class="wf-meta" style="margin-bottom:8px">Zone: Asia/Jakarta</div>
+              <div class="state-desc" style="margin-bottom:10px">Class has no activity link. Task/Habit adds a link to your own record; Focus plans 25 minutes and may link a Task.</div>
+              <button class="wf-btn primary" style="width:100%">Save timebox</button>
+            </div>
+          </div>
+        </div>
+        <div class="frame-holder">
+          <div class="frame-holder-label">Timebox detail</div>
+          <div class="frame frame-fixed" style="width:320px">
+            <div style="padding:16px">
+              <div style="display:flex;gap:6px;margin-bottom:8px"><span class="chip">Class</span><span class="chip hatch">Schedule overlap</span></div>
+              <div style="font-size:14px;font-weight:700;margin-bottom:4px">Database Systems Lab</div>
+              <div class="wf-meta" style="margin-bottom:12px">13:00–14:30 · Asia/Jakarta</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button class="wf-btn sm">Edit</button>
+                <button class="wf-btn sm">Cancel timebox</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="annot">
+          <h5>Interactions &amp; rules</h5>
+          <ul>
+            <li>Every card has a "View all" link to its module. No link points to a page that doesn't exist.</li>
+            <li>The Pomodoro card shows <code>next_phase</code> from the server before start; it never runs a phase automatically.</li>
+            <li>Timebox plans Class/Task/Habit/Focus blocks with a start and end time; a plan never runs, checks in, or completes an activity on its own, and the Timebox clock never triggers a Pomodoro phase.</li>
+            <li>Overlapping blocks are allowed; a "Schedule overlap" marker is informational only and never blocks saving.</li>
+            <li>"Start focus" hands off to a manual start in Pomodoro and follows the server's current state/phase; if <code>next_phase</code> is a break or another session is already open, it points to Pomodoro's controls to resolve that first.</li>
+            <li>Cancelling a block keeps its row in history and never cancels an actual running Pomodoro session.</li>
+            <li>The Tasks and Habits cards intentionally show only a couple of items each, not the full list, so the Timebox stays the focal point of the page.</li>
+          </ul>
+          <div class="states">
+            <h5>States</h5>
+            <ul>
+              <li><strong>Empty:</strong> the card shows "No tasks yet today" plus a create-task button, never sample data disguised as real.</li>
+              <li><strong>Offline:</strong> a text banner above the content, all confirm/check-in actions disabled.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= TASKS ================= -->
+      <section class="screen" id="tasks">
+        <div class="screen-head"><h2>Tasks</h2><span class="route-chip">/tasks</span></div>
+        <p class="screen-purpose">REQ-03, REQ-07, REQ-13. Personal/project tasks with filters for status, project, due date, archive. List, Kanban, and History read the same underlying data.</p>
+        <div class="frame-holder">
+          <div class="frame-holder-label">↔ drag to test width (List view)</div>
+          <div id="slot-tasks-main"></div>
+        </div>
+        <div class="frame-holder">
+          <div class="frame-holder-label">Alternate view (same toggle): Kanban</div>
+          <div class="frame frame-fixed" style="width:100%">
+            <div class="app-content" style="padding:18px">
+              <div class="toolbar" style="border-bottom:none;margin-bottom:12px">
+                <div class="seg"><button>List</button><button class="on">Kanban</button><button>History</button></div>
+                <span class="filter-chip">Project: All <span class="care">▾</span></span>
+                <span class="spacer"></span>
+                <button class="wf-btn primary sm">+ Task</button>
+              </div>
+              <div class="kanban">
+                <div class="kan-col">
+                  <div class="kan-col-head"><span>Todo</span><span>3</span></div>
+                  <div class="kan-card"><div class="t">Competitor research</div><div class="m"><span class="chip">Medium</span></div></div>
+                  <div class="kan-card"><div class="t">Prepare investor slides</div><div class="m"><span class="chip">High</span><span class="chip hatch">Overdue</span></div></div>
+                </div>
+                <div class="kan-col">
+                  <div class="kan-col-head"><span>In Progress</span><span>2</span></div>
+                  <div class="kan-card"><div class="t">Design finance module wireframe</div><div class="m"><span class="chip">Project: Tracker</span></div></div>
+                </div>
+                <div class="kan-col">
+                  <div class="kan-col-head"><span>Done</span><span>4</span></div>
+                  <div class="kan-card" style="opacity:.6"><div class="t">Draft PRD v0.2</div><div class="m"><span class="chip">Done</span></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="frame-holder">
+          <div class="frame-holder-label">Alternate view (same toggle): History</div>
+          <div class="frame frame-fixed" style="width:100%">
+            <div class="app-content" style="padding:18px">
+              <div class="toolbar" style="border-bottom:none;margin-bottom:12px">
+                <div class="seg"><button>List</button><button>Kanban</button><button class="on">History</button></div>
+                <span class="filter-chip">Date range: Last 30 days <span class="care">▾</span></span>
+                <span class="spacer"></span>
+                <span class="wf-meta">Completion events, not current status</span>
+              </div>
+              <div class="wf-meta" style="margin-bottom:6px;font-weight:600">16 Sep 2026</div>
+              <div class="wf-row"><span class="wf-check is-done"></span><span class="wf-row-title">Draft PRD v0.2</span><span class="chip">Project: Tracker</span><span class="wf-meta">Completed 14:22</span></div>
+              <div class="wf-meta" style="margin:10px 0 6px;font-weight:600">10 Sep 2026</div>
+              <div class="wf-row"><span class="wf-check is-done"></span><span class="wf-row-title">Book venue for launch event</span><span class="chip">Project: Q4 Launch</span><span class="wf-meta">Completed 09:47</span></div>
+              <div class="wf-row"><span class="wf-check is-done"></span><span class="wf-row-title">Book venue for launch event</span><span class="chip outline-dash">Reopened, then completed again</span><span class="wf-meta">Completed 16:03</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="frame-holder">
+          <div class="frame-holder-label">Task form (create/edit)</div>
+          <div class="frame frame-fixed" style="width:320px">
+            <div class="side-panel" style="border:none;border-radius:0">
+              <div style="font-weight:700;font-size:13px;margin-bottom:10px">New task</div>
+              <div class="field"><label>Title</label><div class="box">Prepare investor slides</div></div>
+              <div class="field"><label>Priority</label><div class="box">High</div></div>
+              <div class="field"><label>Due date (optional)</label><div class="box">28 Sep 2026</div></div>
+              <div class="field"><label>Project (optional)</label><div class="box">Q4 Launch</div></div>
+              <button class="wf-btn primary" style="width:100%">Save task</button>
+            </div>
+          </div>
+        </div>
+        <div class="frame-holder">
+          <div class="frame-holder-label">Task detail panel (opened from a card/row click)</div>
+          <div class="frame frame-fixed" style="width:420px">
+            <div style="padding:16px">
+              <div style="font-size:14px;font-weight:700;margin-bottom:4px">Prepare investor slides</div>
+              <div style="display:flex;gap:6px;margin-bottom:12px"><span class="chip">High</span><span class="chip hatch">Overdue</span><span class="chip">Project: Q4 Launch</span></div>
+              <div class="wf-placeholder small">Task description</div>
+              <div class="field" style="margin-top:12px">
+                <label>Dependencies (predecessors)</label>
+                <div class="wf-row" style="padding:4px 0"><span class="wf-row-title" style="color:#B00">Collect traction data: not done yet</span><button class="wf-btn ghost sm">Remove</button></div>
+                <button class="wf-btn sm" style="margin-top:6px">+ Add dependency</button>
+              </div>
+              <div class="field" style="margin-top:12px">
+                <label>History</label>
+                <div class="wf-row" style="padding:4px 0"><span class="wf-meta">Created</span><span class="wf-row-title" style="flex:0 1 auto">3 Sep 2026</span></div>
+                <div class="wf-row" style="padding:4px 0"><span class="wf-meta">Status → In Progress</span><span class="wf-row-title" style="flex:0 1 auto">6 Sep 2026</span></div>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+                <button class="wf-btn primary sm">Mark done</button>
+                <button class="wf-btn sm">Start Pomodoro</button>
+                <button class="wf-btn sm">Archive</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="frame-holder">
+          <div class="frame-holder-label">Task detail: done and archived variant</div>
+          <div class="frame frame-fixed" style="width:420px">
+            <div style="padding:16px">
+              <div style="font-size:14px;font-weight:700;margin-bottom:4px;text-decoration:line-through;color:#7A7A72">Draft PRD v0.2</div>
+              <div style="display:flex;gap:6px;margin-bottom:12px"><span class="chip">Done</span><span class="chip">Archived</span><span class="chip">Project: Tracker</span></div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button class="wf-btn sm">Reopen</button>
+                <button class="wf-btn sm">Unarchive</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="annot">
+          <h5>Interactions &amp; rules</h5>
+          <ul>
+            <li>Toggling List/Kanban/History never changes the data: three views of one source.</li>
+            <li>Kanban drag-and-drop must have a non-drag alternative (a button/status picker) for keyboard use.</li>
+            <li>History reads from the immutable event log toward "done", not the task's current status. Completing a task, reopening it, then completing it again produces two completion events, but it stays one unique task.</li>
+            <li>History groups by the project/title snapshot at the time of the event; a later rename, move, or archive doesn't rewrite old history rows.</li>
+            <li>A task with an unfinished predecessor: "Mark done" is disabled, showing the name of the blocking predecessor.</li>
+            <li>An overdue due date uses the text "Overdue", not color alone.</li>
+            <li>Moving a task that has a dependency shows instructions to remove the dependency first.</li>
+            <li>A done task shows "Reopen" instead of "Mark done"; an archived task separately shows "Unarchive", since archive is an attribute independent from status.</li>
+          </ul>
+          <div class="states">
+            <h5>States</h5>
+            <ul>
+              <li><strong>Empty:</strong> "No tasks yet" + a "Create your first task" CTA.</li>
+              <li><strong>Edit conflict:</strong> fetch the latest version, show the difference, never silently overwrite.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= HABITS ================= -->
+      <section class="screen" id="habits">
+        <div class="screen-head"><h2>Habits</h2><span class="route-chip">/habits</span></div>
+        <p class="screen-purpose">REQ-04. Weekly schedule, one check-in per local date, history, and a habit calendar zone fixed since creation.</p>
+        <div class="frame-holder">
+          <div class="frame-holder-label">↔ drag to test width</div>
+          <div id="slot-habits-main"></div>
+        </div>
+        <div class="frame-holder">
+          <div class="frame-holder-label">Schedule edit form</div>
+          <div class="frame frame-fixed" style="width:340px">
+            <div class="side-panel" style="border:none;border-radius:0">
+              <div style="font-weight:700;font-size:13px;margin-bottom:10px">Edit schedule: Read 10 pages</div>
+              <div class="field"><label>Name</label><div class="box">Read 10 pages</div></div>
+              <div class="field"><label>Start date (fixed since creation)</label><div class="box" style="color:#9A9A92">3 Aug 2026</div></div>
+              <div class="field">
+                <label>Scheduled days</label>
+                <div class="habit-dots" style="margin-top:4px">
+                  <span class="habit-dot on">M</span><span class="habit-dot on">T</span><span class="habit-dot off-schedule">W</span><span class="habit-dot on">T</span><span class="habit-dot off-schedule">F</span><span class="habit-dot on">S</span><span class="habit-dot off-schedule">S</span>
+                </div>
+              </div>
+              <div class="state-desc" style="margin:8px 0">Takes effect tomorrow in this habit's zone; today still follows the schedule shown on the main card.</div>
+              <button class="wf-btn primary" style="width:100%">Save schedule</button>
+            </div>
+          </div>
+        </div>
+        <div class="annot">
+          <h5>Interactions &amp; rules</h5>
+          <ul>
+            <li>A dashed schedule dot = an unscheduled day (check-in is rejected for that date).</li>
+            <li>A schedule edit takes effect tomorrow in the habit's zone; the old schedule stays visible in history.</li>
+            <li>An archived habit disables the name/schedule form, but historical check-ins can still be corrected.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ================= POMODORO ================= -->
+      <section class="screen" id="pomodoro">
+        <div class="screen-head"><h2>Pomodoro</h2><span class="route-chip">/pomodoro</span></div>
+        <p class="screen-purpose">REQ-05. 25-minute focus, short/long breaks, one running session per user, pause/resume/cancel controls.</p>
+        <div class="frame-holder">
+          <div class="frame-holder-label">↔ drag to test width</div>
+          <div id="slot-pomodoro-main"></div>
+        </div>
+        <div class="frame-holder">
+          <div class="frame-holder-label">Session state variants</div>
+          <div class="states-grid">
+            <div class="state-card">
+              <h5>Paused</h5>
+              <div class="state-mini" style="display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;padding:14px 10px">
+                <span class="chip">Phase: Focus</span>
+                <div class="bignum" style="font-size:22px">12:04</div>
+                <span class="wf-btn primary sm">Resume</span>
+              </div>
+              <div class="state-desc">Remaining time is preserved while paused; resuming recalculates the deadline from what's left.</div>
+            </div>
+            <div class="state-card">
+              <h5>Focus without a task</h5>
+              <div class="state-mini" style="display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;padding:14px 10px">
+                <span class="chip">Phase: Focus</span>
+                <div class="bignum" style="font-size:22px">24:10</div>
+                <span class="wf-meta">Task: None</span>
+              </div>
+              <div class="state-desc">Focus may run with no linked task; a break is never allowed to have one.</div>
+            </div>
+            <div class="state-card">
+              <h5>Short break</h5>
+              <div class="state-mini" style="display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;padding:14px 10px">
+                <span class="chip">Phase: Short break</span>
+                <div class="bignum" style="font-size:22px">05:00</div>
+              </div>
+              <div class="state-desc">5 minutes, scheduled after any completed focus that isn't a 4th.</div>
+            </div>
+            <div class="state-card">
+              <h5>Long break</h5>
+              <div class="state-mini" style="display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;padding:14px 10px">
+                <span class="chip">Phase: Long break</span>
+                <div class="bignum" style="font-size:22px">15:00</div>
+              </div>
+              <div class="state-desc">15 minutes, offered after every 4th completed focus.</div>
+            </div>
+            <div class="state-card">
+              <h5>Completed</h5>
+              <div class="state-mini" style="display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;padding:14px 10px">
+                <span class="chip">Completed</span>
+                <span class="wf-meta">Focus 25:00 · 09:05–09:30</span>
+                <span class="wf-btn sm">Start next phase</span>
+              </div>
+              <div class="state-desc">The server closes the phase at its deadline even if the browser was closed; the next phase never starts on its own.</div>
+            </div>
+            <div class="state-card">
+              <h5>Cancelled</h5>
+              <div class="state-mini" style="display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;padding:14px 10px">
+                <span class="chip">Cancelled</span>
+                <span class="wf-meta">Elapsed 08:12 · not counted as completed</span>
+              </div>
+              <div class="state-desc">Cancel asks for confirmation; elapsed time stays on record but doesn't add to the completed count.</div>
+            </div>
+            <div class="state-card">
+              <h5>Reload / recovery</h5>
+              <div class="state-mini">Waiting for phase-end confirmation…</div>
+              <div class="state-desc">Shown when the local countdown hits zero before the server has reconciled the deadline; reopening re-fetches <code>server_now</code>, <code>remaining_seconds</code>, and <code>next_phase</code>.</div>
+            </div>
+          </div>
+        </div>
+        <div class="annot">
+          <h5>Interactions &amp; rules</h5>
+          <ul>
+            <li>Before starting, show <code>next_phase</code> from the server. Focus may pick a task; breaks cannot.</li>
+            <li>After a terminal phase, show a button to start the next phase, it never runs on its own.</li>
+            <li>After 4 completed focus sessions, offer "Start long break".</li>
+            <li>Cancel asks for confirmation and explains the elapsed time stays on record but doesn't count as a completed session.</li>
+            <li>While a focus session is running or paused, changing a linked task's status/project, or archiving its project, is blocked with a message that links back to this session (see Tasks/Projects); editing title/priority/due date is still allowed.</li>
+          </ul>
+          <div class="states">
+            <h5>States</h5>
+            <ul><li><strong>Countdown hits zero:</strong> show "Waiting for phase-end confirmation" until the server reconciles, never switch phase client-side right away.</li></ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= PROJECTS ================= -->
+      <section class="screen" id="projects">
+        <div class="screen-head"><h2>Projects</h2><span class="route-chip">/projects</span><span class="route-chip">/projects/:id</span></div>
+        <p class="screen-purpose">REQ-06, REQ-07. A project list with progress; detail uses the same tasks &amp; kanban as the Tasks module, plus dependencies between tasks within the same project.</p>
+        <div class="frame-holder">
+          <div class="frame-holder-label">↔ drag to test width (project list)</div>
+          <div id="slot-projects-main"></div>
+        </div>
+        <div class="frame-holder">
+          <div class="frame-holder-label">Project detail (static)</div>
+          <div class="frame frame-fixed" style="width:100%;max-width:900px">
+            <div style="padding:20px">
+              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:6px">
+                <div>
+                  <div style="font-size:17px;font-weight:700">Q4 Launch</div>
+                  <div style="font-size:12px;color:#7A7A72;margin-top:2px">7 of 12 tasks done</div>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center">
+                  <span class="chip">Active</span>
+                  <button class="wf-btn sm">Complete</button>
+                  <button class="wf-btn sm">Archive</button>
+                </div>
+              </div>
+              <div class="progress" style="margin:12px 0 16px"><i style="width:58%"></i></div>
+              <div class="annot" style="margin:0 0 14px">
+                <h5>Blocked task</h5>
+                <ul><li>"Send to print" can't be completed: waiting on "Final design approval".</li></ul>
+              </div>
+              <div class="kanban" style="grid-template-columns:repeat(3,1fr)">
+                <div class="kan-col"><div class="kan-col-head"><span>Todo</span><span>2</span></div><div class="kan-card"><div class="t">Final design approval</div></div></div>
+                <div class="kan-col"><div class="kan-col-head"><span>In Progress</span><span>1</span></div><div class="kan-card"><div class="t">Send to print</div><div class="m"><span class="chip hatch">Blocked</span></div></div></div>
+                <div class="kan-col"><div class="kan-col-head"><span>Done</span><span>7</span></div><div class="kan-card" style="opacity:.6"><div class="t">Venue booking</div></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="frame-holder">
+          <div class="frame-holder-label">Project detail: done and archived variant</div>
+          <div class="frame frame-fixed" style="width:100%;max-width:520px">
+            <div style="padding:20px">
+              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+                <div>
+                  <div style="font-size:17px;font-weight:700">Legacy Website Migration</div>
+                  <div style="font-size:12px;color:#7A7A72;margin-top:2px">5 of 5 tasks done</div>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center">
+                  <span class="chip">Done</span>
+                  <span class="chip">Archived</span>
+                </div>
+              </div>
+              <div class="progress" style="margin:12px 0 16px"><i style="width:100%"></i></div>
+              <button class="wf-btn sm">Reopen</button>
+            </div>
+          </div>
+        </div>
+        <div class="annot">
+          <h5>Interactions &amp; rules</h5>
+          <ul>
+            <li>A project with no tasks shows 0% progress, not an unexplained blank.</li>
+            <li>An archived project doesn't show in the main list (default filter: Active); switch the Status filter to Archived/All to see it again.</li>
+            <li>Archiving a project asks for confirmation because it immediately hides it from the main list.</li>
+            <li>Completing a project is rejected while any non-archived task is still unfinished.</li>
+            <li>Done and archived are independent, so both chips can show together; either state shows a "Reopen" action, and reopening never auto-archives or auto-unarchives its tasks.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ================= FINANCE ACCOUNTS ================= -->
+      <section class="screen" id="fin-accounts">
+        <div class="screen-head"><h2>Accounts &amp; Categories</h2><span class="route-chip">/finance/accounts</span><span class="route-chip">/finance/categories</span></div>
+        <p class="screen-purpose">REQ-08. Multiple IDR accounts with an opening balance; balance is computed from transactions. Income/expense categories are managed separately.</p>
+        <div class="frame-holder">
+          <div class="frame-holder-label">↔ drag to test width</div>
+          <div id="slot-finaccounts-main"></div>
+        </div>
+        <div class="annot">
+          <h5>Interactions &amp; rules</h5>
+          <ul>
+            <li>The opening balance can be corrected; every correction keeps an immutable history entry instead of overwriting the old value.</li>
+            <li>Archived accounts/categories still show on old transactions, but aren't offered for new ones.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ================= FINANCE TRANSACTIONS ================= -->
+      <section class="screen" id="fin-tx">
+        <div class="screen-head"><h2>Transactions</h2><span class="route-chip">/finance/transactions</span></div>
+        <p class="screen-purpose">REQ-09, REQ-10. Manual income/expense, transfers between accounts, drafts from recurring rules, and a revision history per transaction.</p>
+        <div class="frame-holder">
+          <div class="frame-holder-label">↔ drag to test width</div>
+          <div id="slot-fintx-main"></div>
+        </div>
+        <div class="frame-holder">
+          <div class="frame-holder-label">Transaction form &amp; Transfer form (opened from the toolbar)</div>
+          <div class="resp-row">
+            <div class="frame frame-fixed" style="width:280px">
+              <div class="side-panel" style="border:none;border-radius:0">
+                <div style="font-weight:700;font-size:13px;margin-bottom:10px">New transaction</div>
+                <div class="field"><label>Type</label><div class="box">Expense</div></div>
+                <div class="field"><label>Account</label><div class="box">BCA · Rp 4,120,000</div></div>
+                <div class="field"><label>Amount (IDR)</label><div class="box">150,000</div></div>
+                <div class="field"><label>Category</label><div class="box">Food &amp; Drink</div></div>
+                <div class="field"><label>Date</label><div class="box">16 Sep 2026</div></div>
+                <button class="wf-btn primary" style="width:100%">Save transaction</button>
+              </div>
+            </div>
+            <div class="frame frame-fixed" style="width:280px">
+              <div class="side-panel" style="border:none;border-radius:0">
+                <div style="font-weight:700;font-size:13px;margin-bottom:10px">Transfer between accounts</div>
+                <div class="field"><label>From account</label><div class="box">BCA · Rp 4,120,000</div></div>
+                <div class="field"><label>To account</label><div class="box">Dana · Rp 850,000</div></div>
+                <div class="field"><label>Amount (IDR)</label><div class="box">500,000</div></div>
+                <div class="annot" style="margin:10px 0">
+                  <h5>Effect preview</h5>
+                  <ul><li>BCA: Rp 4,120,000 → Rp 3,620,000</li><li>Dana: Rp 850,000 → Rp 1,350,000</li></ul>
+                </div>
+                <button class="wf-btn primary" style="width:100%">Confirm transfer</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="annot">
+          <h5>Interactions &amp; rules</h5>
+          <ul>
+            <li>A draft is labeled "Doesn't affect balance yet" with Edit/Confirm/Cancel actions.</li>
+            <li>A corrected posted transaction shows a create/edit/post/void revision history.</li>
+            <li>The submit button locks while the request is in flight; a retry reuses the same idempotency key.</li>
+            <li>Transfers never appear in income/expense reports.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ================= FINANCE BUDGETS ================= -->
+      <section class="screen" id="fin-budget">
+        <div class="screen-head"><h2>Budgets</h2><span class="route-chip">/finance/budgets</span></div>
+        <p class="screen-purpose">REQ-11. One budget per expense category per month; actuals are computed from posted transactions in the current month.</p>
+        <div class="frame-holder">
+          <div class="frame-holder-label">↔ drag to test width</div>
+          <div id="slot-finbudget-main"></div>
+        </div>
+        <div class="annot">
+          <h5>Interactions &amp; rules</h5>
+          <ul><li>Going over budget uses the text "Over budget" plus a hatch pattern on the progress bar, not red color alone.</li></ul>
+        </div>
+      </section>
+
+      <!-- ================= SETTINGS ================= -->
+      <section class="screen" id="settings">
+        <div class="screen-head"><h2>Settings</h2><span class="route-chip">/settings</span></div>
+        <p class="screen-purpose">REQ-17. Name, IANA timezone, login methods, and logging out other devices.</p>
+        <div class="frame-holder">
+          <div class="frame-holder-label">↔ drag to test width</div>
+          <div id="slot-settings-main"></div>
+        </div>
+        <div class="annot">
+          <h5>Interactions &amp; rules</h5>
+          <ul>
+            <li>Changing timezone shows an explanation: report grouping follows the new zone, but transaction dates, check-ins, habit zone, and rule zones don't change.</li>
+            <li>Unlinking Google is only available once a password is active.</li>
+            <li>Reached by clicking the profile area (avatar + name) in the sidebar, not a separate nav item.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ================= STATES ================= -->
+      <section class="screen" id="states">
+        <div class="screen-head"><h2>State Patterns</h2></div>
+        <p class="screen-purpose">REQ-16. Patterns that repeat across every module above, shown once here as a reference instead of being redrawn on every screen.</p>
+        <div class="states-grid">
+          <div class="state-card">
+            <h5>Empty</h5>
+            <div class="state-mini" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center">
+              <span>No tasks yet</span>
+              <span class="wf-btn primary sm">Create your first task</span>
+            </div>
+            <div class="state-desc">State that no data exists yet + an action. Never show sample data as if it were real.</div>
+          </div>
+          <div class="state-card">
+            <h5>Loading</h5>
+            <div class="state-mini"><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>
+            <div class="state-desc">A labeled indicator, prevent double submit, keep the page's context.</div>
+          </div>
+          <div class="state-card">
+            <h5>Validation error</h5>
+            <div class="state-mini">Amount must be greater than 0<br><span style="color:#7A7A72">Input is preserved.</span></div>
+            <div class="state-desc">Message near the field + a summary that receives focus.</div>
+          </div>
+          <div class="state-card">
+            <h5>Server error</h5>
+            <div class="state-mini" style="display:flex;justify-content:space-between;align-items:center">Save failed <span class="wf-btn sm">Retry</span></div>
+            <div class="state-desc">No fake success toast; input stays so it can be retried.</div>
+          </div>
+          <div class="state-card">
+            <h5>Offline</h5>
+            <div class="state-mini">You're offline. Changes won't be saved.</div>
+            <div class="state-desc">Stale data is labeled "not up to date"; mutations disabled.</div>
+          </div>
+          <div class="state-card">
+            <h5>Session expired</h5>
+            <div class="state-mini" style="display:flex;flex-direction:column;gap:8px">Your session expired, log in again to continue. <span class="wf-btn primary sm" style="align-self:flex-start">Log in again</span></div>
+            <div class="state-desc">Account data cache is cleared on logout; never exposed to the next user.</div>
+          </div>
+          <div class="state-card">
+            <h5>Not found</h5>
+            <div class="state-mini">Data not found. <a href="#tasks" class="wf-link">Back to the list</a></div>
+            <div class="state-desc">A generic message that never leaks who owns the resource.</div>
+          </div>
+          <div class="state-card">
+            <h5>Edit conflict</h5>
+            <div class="state-mini">This record changed elsewhere. Review the latest version before saving.</div>
+            <div class="state-desc">Fetch the latest data, show the conflict, never silently overwrite.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= RESPONSIVE ================= -->
+      <section class="screen" id="responsive">
+        <div class="screen-head"><h2>Responsive Test</h2></div>
+        <p class="screen-purpose">UX-FLOWS requires testing at 360, 768, and 1440 px, with no page overflow. The two screens below use the exact same markup as the Dashboard and Tasks sections above, locked at those three widths for a direct comparison.</p>
+        <div class="resp-row" style="margin-bottom:26px">
+          <div class="resp-col"><div class="resp-col-label">1440 px</div><div id="slot-today-1440"></div></div>
+          <div class="resp-col"><div class="resp-col-label">768 px</div><div id="slot-today-768"></div></div>
+          <div class="resp-col"><div class="resp-col-label">360 px</div><div id="slot-today-360"></div></div>
+        </div>
+        <div class="resp-row">
+          <div class="resp-col"><div class="resp-col-label">1440 px</div><div id="slot-tasks-1440"></div></div>
+          <div class="resp-col"><div class="resp-col-label">768 px</div><div id="slot-tasks-768"></div></div>
+          <div class="resp-col"><div class="resp-col-label">360 px</div><div id="slot-tasks-360"></div></div>
+        </div>
+        <div class="annot" style="margin-top:18px">
+          <h5>What changes below 660 px (the container threshold)</h5>
+          <ul>
+            <li>The sidebar turns into a topbar with a menu (hamburger) button, openable/closable via keyboard.</li>
+            <li>The 2-column card grid becomes a single full-width column.</li>
+            <li>Kanban columns become a labeled horizontal scroll area bounded by the container, not a page that widens.</li>
+          </ul>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <footer class="decisions">
+    <h3>Decisions &amp; reasons (R-31)</h3>
+    <ol>
+      <li><strong>Fully grayscale inside every frame:</strong> so hierarchy and structure are judged apart from color taste. The DESIGN.md palette (single green accent, warm paper) only comes in at the high-fidelity stage.</li>
+      <li><strong>IBM Plex Sans/Mono chrome font, not Fraunces/Inter:</strong> keeps this document read as a structural spec, not a preview of the product's final visual identity.</li>
+      <li><strong>A single blue accent used only for this page's own annotations &amp; navigation:</strong> mirrors the red-pen/marker convention on a printed wireframe, used consistently for one role (spec notes), never inside a frame's own content.</li>
+      <li><strong>Diagonal hatching for "needs attention" status:</strong> overdue and over-budget are marked with a pattern, not color, in line with REQ-15's requirement that status never depend on color alone.</li>
+      <li><strong>Frames are draggable (resize-horizontal) and use container queries:</strong> testing 1440/768/360 px is real reflow, not three static pictures that could silently drift out of sync with the actual CSS.</li>
+      <li><strong>Elements inside a frame have no real behavior wired up:</strong> this is a planning wireframe, not a click-through prototype; faking "live" behavior without a real backend would only hide what's settled from what's still an assumption.</li>
+      <li><strong>State patterns (empty/loading/error/offline) collected once in one place:</strong> avoids repeating eight states on every single screen while still asserting that REQ-16 applies across every module.</li>
+    </ol>
+  </footer>
+</div>
+
+<!-- ================= TEMPLATES ================= -->
+<template id="tpl-today">
+  <div class="app-shell">
+    <aside class="app-sidebar">
+      <div class="brand-mark"><span class="sq"></span><span>Tracker</span></div>
+      <div class="nav-item active"><span class="dot"></span>Dashboard</div>
+      <div class="nav-item"><span class="dot"></span>Tasks</div>
+      <div class="nav-item"><span class="dot"></span>Habits</div>
+      <div class="nav-item"><span class="dot"></span>Pomodoro</div>
+      <div class="nav-item"><span class="dot"></span>Projects</div>
+      <div class="nav-item"><span class="dot"></span>Finance</div>
+      <div class="nav-foot"><span class="avatar-ph"></span>Budi S.<span class="nav-caret"></span></div>
+    </aside>
+    <div>
+      <div class="app-topbar"><span class="burger"><span></span><span></span><span></span></span><span class="app-topbar-title">Dashboard</span></div>
+      <div class="app-content">
+        <div class="page-head"><span class="route-chip">/dashboard</span><h3>Good morning, Thursday 17 Sep 2026</h3></div>
+        <div class="grid-cards">
+          <section class="wf-card span-2">
+            <div class="wf-card-head">Today's Timebox <span class="route-chip" style="font-size:10px">REQ-18</span></div>
+            <div class="timebox">
+              <div class="tb-row"><span class="tb-time">07:00–09:00</span><div class="tb-block"><span class="chip">Class</span> Statistics Lecture</div></div>
+              <div class="tb-row"><span class="tb-time">09:30–09:55</span><div class="tb-block"><span class="chip">Focus</span> Competitor research</div></div>
+              <div class="tb-row"><span class="tb-time">13:00–14:30</span><div class="tb-block"><span class="chip">Class</span> Database Systems Lab</div></div>
+              <div class="tb-row"><span class="tb-time">15:00–15:30</span><div class="tb-block"><span class="chip">Task</span> File tax report</div></div>
+              <div class="tb-row"><span class="tb-time">19:00–19:30</span><div class="tb-block"><span class="chip">Habit</span> Read 10 pages</div></div>
+            </div>
+          </section>
+          <section class="wf-card">
+            <div class="wf-card-head">Tasks <a class="wf-link" href="#tasks">View all →</a></div>
+            <div class="wf-row"><span class="wf-check"></span><span class="wf-row-title">File tax report</span><span class="chip">High</span><span class="wf-meta">Today</span></div>
+            <div class="wf-row is-overdue"><span class="wf-check"></span><span class="wf-row-title">Pay internet bill</span><span class="chip">Low</span><span class="wf-meta">Overdue</span></div>
+          </section>
+          <section class="wf-card">
+            <div class="wf-card-head">Habits <a class="wf-link" href="#habits">View all →</a></div>
+            <div class="wf-row"><span class="wf-check is-done"></span><span class="wf-row-title">Read 10 pages</span><span class="wf-meta">3/5 this week</span></div>
+            <div class="wf-row"><span class="wf-check"></span><span class="wf-row-title">Morning run</span><span class="wf-meta">2/3 this week</span></div>
+          </section>
+          <section class="wf-card">
+            <div class="wf-card-head">Pomodoro <a class="wf-link" href="#pomodoro">Open →</a></div>
+            <div class="wf-pomo-mini"><span class="chip">Next: Focus</span><span class="wf-row-title">Not started</span><button class="wf-btn primary sm">Start Focus</button></div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<template id="tpl-tasks">
+  <div class="app-shell">
+    <aside class="app-sidebar">
+      <div class="brand-mark"><span class="sq"></span><span>Tracker</span></div>
+      <div class="nav-item"><span class="dot"></span>Dashboard</div>
+      <div class="nav-item active"><span class="dot"></span>Tasks</div>
+      <div class="nav-item"><span class="dot"></span>Habits</div>
+      <div class="nav-item"><span class="dot"></span>Pomodoro</div>
+      <div class="nav-item"><span class="dot"></span>Projects</div>
+      <div class="nav-item"><span class="dot"></span>Finance</div>
+      <div class="nav-foot"><span class="avatar-ph"></span>Budi S.<span class="nav-caret"></span></div>
+    </aside>
+    <div>
+      <div class="app-topbar"><span class="burger"><span></span><span></span><span></span></span><span class="app-topbar-title">Tasks</span></div>
+      <div class="app-content">
+        <div class="page-head"><span class="route-chip">/tasks</span><h3>Tasks</h3></div>
+        <div class="toolbar">
+          <div class="seg"><button class="on">List</button><button>Kanban</button><button>History</button></div>
+          <span class="filter-chip">Status: All <span class="care">▾</span></span>
+          <span class="filter-chip">Project <span class="care">▾</span></span>
+          <span class="filter-chip">Due date <span class="care">▾</span></span>
+          <span class="filter-chip">Archived <span class="care">▾</span></span>
+          <span class="spacer"></span>
+          <button class="wf-btn primary sm">+ New Task</button>
+        </div>
+        <div class="wf-row"><span class="wf-check"></span><span class="wf-row-title">Competitor research</span><span class="chip">Project: Q4 Launch</span><span class="chip">Medium</span><span class="wf-meta">28 Sep</span></div>
+        <div class="wf-row is-overdue"><span class="wf-check"></span><span class="wf-row-title">Prepare investor slides</span><span class="chip">Project: Q4 Launch</span><span class="chip">High</span><span class="wf-meta">Overdue</span></div>
+        <div class="wf-row"><span class="wf-check"></span><span class="wf-row-title">Buy train ticket</span><span class="chip">Personal</span><span class="chip">Low</span><span class="wf-meta">2 Oct</span></div>
+        <div class="wf-row"><span class="wf-check is-done"></span><span class="wf-row-title" style="text-decoration:line-through;color:#9A9A92">Draft PRD v0.2</span><span class="chip">Done</span><span class="wf-meta">Done 15 Sep</span></div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<template id="tpl-habits">
+  <div class="app-shell">
+    <aside class="app-sidebar">
+      <div class="brand-mark"><span class="sq"></span><span>Tracker</span></div>
+      <div class="nav-item"><span class="dot"></span>Dashboard</div>
+      <div class="nav-item"><span class="dot"></span>Tasks</div>
+      <div class="nav-item active"><span class="dot"></span>Habits</div>
+      <div class="nav-item"><span class="dot"></span>Pomodoro</div>
+      <div class="nav-item"><span class="dot"></span>Projects</div>
+      <div class="nav-item"><span class="dot"></span>Finance</div>
+      <div class="nav-foot"><span class="avatar-ph"></span>Budi S.<span class="nav-caret"></span></div>
+    </aside>
+    <div>
+      <div class="app-topbar"><span class="burger"><span></span><span></span><span></span></span><span class="app-topbar-title">Habits</span></div>
+      <div class="app-content">
+        <div class="page-head"><span class="route-chip">/habits</span><h3>Habits</h3><span class="spacer" style="flex:1"></span><button class="wf-btn primary sm">+ New Habit</button></div>
+        <section class="wf-card" style="margin-bottom:12px">
+          <div class="wf-card-head">Read 10 pages <span class="wf-meta">Zone: Asia/Jakarta (fixed)</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+            <div class="habit-dots">
+              <span class="habit-dot on">M</span><span class="habit-dot on">T</span><span class="habit-dot off-schedule">W</span><span class="habit-dot on">T</span><span class="habit-dot off-schedule">F</span><span class="habit-dot">S</span><span class="habit-dot off-schedule">S</span>
+            </div>
+            <div class="wf-meta">3/5 this week</div>
+            <button class="wf-btn primary sm">Check in today</button>
+          </div>
+        </section>
+        <section class="wf-card">
+          <div class="wf-card-head">Morning run</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+            <div class="habit-dots">
+              <span class="habit-dot off-schedule">M</span><span class="habit-dot on">T</span><span class="habit-dot off-schedule">W</span><span class="habit-dot">T</span><span class="habit-dot off-schedule">F</span><span class="habit-dot on">S</span><span class="habit-dot off-schedule">S</span>
+            </div>
+            <div class="wf-meta">2/3 this week</div>
+            <button class="wf-btn sm">Undo check-in</button>
+          </div>
+          <div class="wf-placeholder small" style="margin-top:12px">Check-in history calendar</div>
+        </section>
+      </div>
+    </div>
+  </div>
+</template>
+
+<template id="tpl-pomodoro">
+  <div class="app-shell">
+    <aside class="app-sidebar">
+      <div class="brand-mark"><span class="sq"></span><span>Tracker</span></div>
+      <div class="nav-item"><span class="dot"></span>Dashboard</div>
+      <div class="nav-item"><span class="dot"></span>Tasks</div>
+      <div class="nav-item"><span class="dot"></span>Habits</div>
+      <div class="nav-item active"><span class="dot"></span>Pomodoro</div>
+      <div class="nav-item"><span class="dot"></span>Projects</div>
+      <div class="nav-item"><span class="dot"></span>Finance</div>
+      <div class="nav-foot"><span class="avatar-ph"></span>Budi S.<span class="nav-caret"></span></div>
+    </aside>
+    <div>
+      <div class="app-topbar"><span class="burger"><span></span><span></span><span></span></span><span class="app-topbar-title">Pomodoro</span></div>
+      <div class="app-content">
+        <div class="page-head"><span class="route-chip">/pomodoro</span><h3>Pomodoro</h3></div>
+        <section class="wf-card">
+          <div class="timer-circle">
+            <span class="chip">Phase: Focus</span>
+            <div class="bignum">18:42</div>
+            <div class="wf-meta">Task: Competitor research</div>
+            <div style="display:flex;gap:10px"><button class="wf-btn sm">Pause</button><button class="wf-btn sm">Cancel</button></div>
+            <div class="wf-meta">Focus sessions completed today: 2/4</div>
+          </div>
+        </section>
+        <section class="wf-card" style="margin-top:14px">
+          <div class="wf-card-head">Session History</div>
+          <div class="wf-row"><span class="wf-row-title">Focus · Competitor research</span><span class="chip">Done</span><span class="wf-meta">09:05–09:30</span></div>
+          <div class="wf-row"><span class="wf-row-title">Short break</span><span class="chip">Cancelled</span><span class="wf-meta">09:30–09:31</span></div>
+        </section>
+      </div>
+    </div>
+  </div>
+</template>
+
+<template id="tpl-projects">
+  <div class="app-shell">
+    <aside class="app-sidebar">
+      <div class="brand-mark"><span class="sq"></span><span>Tracker</span></div>
+      <div class="nav-item"><span class="dot"></span>Dashboard</div>
+      <div class="nav-item"><span class="dot"></span>Tasks</div>
+      <div class="nav-item"><span class="dot"></span>Habits</div>
+      <div class="nav-item"><span class="dot"></span>Pomodoro</div>
+      <div class="nav-item active"><span class="dot"></span>Projects</div>
+      <div class="nav-item"><span class="dot"></span>Finance</div>
+      <div class="nav-foot"><span class="avatar-ph"></span>Budi S.<span class="nav-caret"></span></div>
+    </aside>
+    <div>
+      <div class="app-topbar"><span class="burger"><span></span><span></span><span></span></span><span class="app-topbar-title">Projects</span></div>
+      <div class="app-content">
+        <div class="page-head"><span class="route-chip">/projects</span><h3>Projects</h3><span style="flex:1"></span><button class="wf-btn primary sm">+ New Project</button></div>
+        <div class="toolbar">
+          <span class="filter-chip">Status: Active <span class="care">▾</span></span>
+          <span class="spacer"></span>
+          <span class="wf-meta">1 archived project not shown</span>
+        </div>
+        <div class="grid-cards">
+          <section class="wf-card">
+            <div class="wf-card-head">Q4 Launch <span class="chip">Active</span></div>
+            <div class="wf-meta" style="margin-bottom:6px">7 of 12 tasks</div>
+            <div class="progress"><i style="width:58%"></i></div>
+          </section>
+          <section class="wf-card">
+            <div class="wf-card-head">Kitchen Renovation <span class="chip">Active</span></div>
+            <div class="wf-meta" style="margin-bottom:6px">2 of 9 tasks</div>
+            <div class="progress"><i style="width:22%"></i></div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<template id="tpl-finaccounts">
+  <div class="app-shell">
+    <aside class="app-sidebar">
+      <div class="brand-mark"><span class="sq"></span><span>Tracker</span></div>
+      <div class="nav-item"><span class="dot"></span>Dashboard</div>
+      <div class="nav-item"><span class="dot"></span>Tasks</div>
+      <div class="nav-item"><span class="dot"></span>Habits</div>
+      <div class="nav-item"><span class="dot"></span>Pomodoro</div>
+      <div class="nav-item"><span class="dot"></span>Projects</div>
+      <div class="nav-item active"><span class="dot"></span>Finance</div>
+      <div class="nav-foot"><span class="avatar-ph"></span>Budi S.<span class="nav-caret"></span></div>
+    </aside>
+    <div>
+      <div class="app-topbar"><span class="burger"><span></span><span></span><span></span></span><span class="app-topbar-title">Accounts &amp; Categories</span></div>
+      <div class="app-content">
+        <div class="page-head"><span class="route-chip">/finance/accounts</span><h3>Accounts &amp; Categories</h3></div>
+        <div class="grid-cards">
+          <section class="wf-card">
+            <div class="wf-card-head">Accounts <button class="wf-btn sm">+ Account</button></div>
+            <div class="wf-row"><span class="wf-row-title">BCA</span><span class="wf-meta mono" style="font-variant-numeric:tabular-nums">Rp 3,620,000</span></div>
+            <div class="wf-row"><span class="wf-row-title">Dana</span><span class="wf-meta mono" style="font-variant-numeric:tabular-nums">Rp 1,350,000</span></div>
+            <div class="wf-row"><span class="wf-row-title" style="color:#9A9A92">Cash (archived)</span><span class="wf-meta mono">Rp 0</span></div>
+          </section>
+          <section class="wf-card">
+            <div class="wf-card-head">Categories <button class="wf-btn sm">+ Category</button></div>
+            <div class="seg" style="margin-bottom:10px"><button class="on">Expense</button><button>Income</button></div>
+            <div class="wf-row"><span class="wf-row-title">Food &amp; Drink</span><span class="wf-actions"><button class="wf-btn ghost sm">Rename</button></span></div>
+            <div class="wf-row"><span class="wf-row-title">Transportation</span><span class="wf-actions"><button class="wf-btn ghost sm">Archive</button></span></div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<template id="tpl-fintx">
+  <div class="app-shell">
+    <aside class="app-sidebar">
+      <div class="brand-mark"><span class="sq"></span><span>Tracker</span></div>
+      <div class="nav-item"><span class="dot"></span>Dashboard</div>
+      <div class="nav-item"><span class="dot"></span>Tasks</div>
+      <div class="nav-item"><span class="dot"></span>Habits</div>
+      <div class="nav-item"><span class="dot"></span>Pomodoro</div>
+      <div class="nav-item"><span class="dot"></span>Projects</div>
+      <div class="nav-item active"><span class="dot"></span>Finance</div>
+      <div class="nav-foot"><span class="avatar-ph"></span>Budi S.<span class="nav-caret"></span></div>
+    </aside>
+    <div>
+      <div class="app-topbar"><span class="burger"><span></span><span></span><span></span></span><span class="app-topbar-title">Transactions</span></div>
+      <div class="app-content">
+        <div class="page-head"><span class="route-chip">/finance/transactions</span><h3>Transactions</h3></div>
+        <div class="toolbar">
+          <span class="filter-chip">Account: All <span class="care">▾</span></span>
+          <span class="filter-chip">Category <span class="care">▾</span></span>
+          <span class="filter-chip">Date range <span class="care">▾</span></span>
+          <span class="spacer"></span>
+          <button class="wf-btn sm">+ Transfer</button>
+          <button class="wf-btn primary sm">+ Transaction</button>
+        </div>
+        <div class="table-scroll">
+          <table class="wf-table">
+            <thead><tr><th>Date</th><th>Type</th><th>Account</th><th>Category</th><th>Note</th><th style="text-align:right">Amount</th></tr></thead>
+            <tbody>
+              <tr><td>16 Sep</td><td><span class="chip">Out</span></td><td>BCA</td><td>Food &amp; Drink</td><td>Team lunch</td><td class="wf-amount">-Rp 150,000</td></tr>
+              <tr><td>15 Sep</td><td><span class="chip">In</span></td><td>BCA</td><td>Salary</td><td>September salary</td><td class="wf-amount">Rp 8,500,000</td></tr>
+              <tr><td>14 Sep</td><td><span class="chip">Transfer</span></td><td>BCA → Dana</td><td>-</td><td>E-wallet top-up</td><td class="wf-amount">Rp 500,000</td></tr>
+              <tr><td>20 Sep</td><td><span class="chip outline-dash">Draft</span></td><td>BCA</td><td>Subscription</td><td>Monthly streaming</td><td class="wf-amount">-Rp 54,000</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<template id="tpl-finbudget">
+  <div class="app-shell">
+    <aside class="app-sidebar">
+      <div class="brand-mark"><span class="sq"></span><span>Tracker</span></div>
+      <div class="nav-item"><span class="dot"></span>Dashboard</div>
+      <div class="nav-item"><span class="dot"></span>Tasks</div>
+      <div class="nav-item"><span class="dot"></span>Habits</div>
+      <div class="nav-item"><span class="dot"></span>Pomodoro</div>
+      <div class="nav-item"><span class="dot"></span>Projects</div>
+      <div class="nav-item active"><span class="dot"></span>Finance</div>
+      <div class="nav-foot"><span class="avatar-ph"></span>Budi S.<span class="nav-caret"></span></div>
+    </aside>
+    <div>
+      <div class="app-topbar"><span class="burger"><span></span><span></span><span></span></span><span class="app-topbar-title">Budgets</span></div>
+      <div class="app-content">
+        <div class="page-head"><span class="route-chip">/finance/budgets</span><h3>Budgets · September 2026</h3><span style="flex:1"></span><button class="wf-btn primary sm">+ Budget</button></div>
+        <section class="wf-card" style="margin-bottom:10px">
+          <div class="wf-card-head">Food &amp; Drink<span class="wf-meta">Rp 1,150,000 / Rp 1,000,000</span></div>
+          <div class="progress hatch"><i style="width:100%"></i></div>
+          <div class="wf-meta" style="margin-top:6px;font-weight:700">Over budget: Rp 150,000</div>
+        </section>
+        <section class="wf-card">
+          <div class="wf-card-head">Transportation<span class="wf-meta">Rp 320,000 / Rp 600,000</span></div>
+          <div class="progress"><i style="width:53%"></i></div>
+          <div class="wf-meta" style="margin-top:6px">Rp 280,000 left</div>
+        </section>
+      </div>
+    </div>
+  </div>
+</template>
+
+<template id="tpl-settings">
+  <div class="app-shell">
+    <aside class="app-sidebar">
+      <div class="brand-mark"><span class="sq"></span><span>Tracker</span></div>
+      <div class="nav-item"><span class="dot"></span>Dashboard</div>
+      <div class="nav-item"><span class="dot"></span>Tasks</div>
+      <div class="nav-item"><span class="dot"></span>Habits</div>
+      <div class="nav-item"><span class="dot"></span>Pomodoro</div>
+      <div class="nav-item"><span class="dot"></span>Projects</div>
+      <div class="nav-item"><span class="dot"></span>Finance</div>
+      <div class="nav-foot"><span class="avatar-ph"></span>Budi S.<span class="nav-caret"></span></div>
+    </aside>
+    <div>
+      <div class="app-topbar"><span class="burger"><span></span><span></span><span></span></span><span class="app-topbar-title">Settings</span></div>
+      <div class="app-content">
+        <div class="page-head"><span class="route-chip">/settings</span><h3>Settings</h3></div>
+        <section class="wf-card" style="margin-bottom:12px">
+          <div class="wf-card-head">Profile</div>
+          <div class="field"><label>Name</label><div class="box">Budi Santoso</div></div>
+          <div class="field"><label>Timezone</label><div class="box">Asia/Jakarta (WIB)</div></div>
+          <div class="wf-meta">Defaults: English · IDR · Week starts Monday</div>
+          <button class="wf-btn primary sm" style="margin-top:10px">Save</button>
+        </section>
+        <section class="wf-card" style="margin-bottom:12px">
+          <div class="wf-card-head">Login Methods</div>
+          <div class="wf-row"><span class="wf-row-title">Google · budi@email.com</span><button class="wf-btn sm">Unlink</button></div>
+          <div class="wf-row"><span class="wf-row-title">Password</span><button class="wf-btn sm">Change password</button></div>
+        </section>
+        <section class="wf-card">
+          <div class="wf-card-head">Devices</div>
+          <button class="wf-btn sm">Log out of all devices</button>
+          <div class="state-desc" style="margin-top:6px">Also signs this device out; you'll need to log in again.</div>
+        </section>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+(function(){
+  function mount(tplId, slotId, opts){
+    opts = opts || {};
+    var tpl = document.getElementById(tplId);
+    var slot = document.getElementById(slotId);
+    if(!tpl || !slot) return;
+    var frame = document.createElement('div');
+    frame.className = 'frame' + (opts.resizable === false ? ' frame-fixed' : '');
+    frame.style.width = (opts.width || 1120) + 'px';
+    frame.appendChild(tpl.content.cloneNode(true));
+    slot.appendChild(frame);
+    if(opts.resizable !== false && 'ResizeObserver' in window){
+      var label = document.createElement('div');
+      label.className = 'frame-readout';
+      frame.appendChild(label);
+      var ro = new ResizeObserver(function(entries){
+        for(var i=0;i<entries.length;i++){
+          label.textContent = Math.round(entries[i].contentRect.width) + ' px';
+        }
+      });
+      ro.observe(frame);
+    }
+  }
+  document.addEventListener('DOMContentLoaded', function(){
+    mount('tpl-today','slot-today-main',{width:1120});
+    mount('tpl-tasks','slot-tasks-main',{width:1120});
+    mount('tpl-habits','slot-habits-main',{width:1000});
+    mount('tpl-pomodoro','slot-pomodoro-main',{width:900});
+    mount('tpl-projects','slot-projects-main',{width:1000});
+    mount('tpl-finaccounts','slot-finaccounts-main',{width:1000});
+    mount('tpl-fintx','slot-fintx-main',{width:1120});
+    mount('tpl-finbudget','slot-finbudget-main',{width:900});
+    mount('tpl-settings','slot-settings-main',{width:900});
+
+    mount('tpl-today','slot-today-1440',{width:1440,resizable:false});
+    mount('tpl-today','slot-today-768',{width:768,resizable:false});
+    mount('tpl-today','slot-today-360',{width:360,resizable:false});
+    mount('tpl-tasks','slot-tasks-1440',{width:1440,resizable:false});
+    mount('tpl-tasks','slot-tasks-768',{width:768,resizable:false});
+    mount('tpl-tasks','slot-tasks-360',{width:360,resizable:false});
+  });
+})();
+</script>

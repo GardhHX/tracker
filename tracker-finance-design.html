@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tracker Finance, hi-fi design</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+/* ============================================================
+   TOKENS — copied verbatim from src/app/globals.css so this file
+   renders the same "quiet ledger" system as the shipped landing
+   page and the Tasks/Habits/Pomodoro design files, not a
+   lookalike. Any drift here is a bug in this file, not a restyle.
+   ============================================================ */
+:root {
+  --paper: #f7f4ed;
+  --surface: #ffffff;
+  --surface-2: #fbf8f2;
+  --ink: #1b1a16;
+  --ink-soft: #3d3b34;
+  --muted: #6a675c;
+  --line: #e5e0d4;
+  --line-strong: #d8d2c3;
+  --accent: #146a46;
+  --accent-solid: #17724c;
+  --accent-ink: #ffffff;
+  --accent-wash: #e7efe8;
+  --danger: #b42318;
+  --focus: #17724c;
+  --shadow-card: 0 1px 0 rgba(27, 26, 22, 0.03), 0 1px 2px rgba(27, 26, 22, 0.05);
+  --shadow-lift: 0 18px 40px -24px rgba(27, 26, 22, 0.28);
+  --r-chip: 999px;
+  --r-btn: 10px;
+  --r-input: 12px;
+  --r-card: 14px;
+  --r-panel: 20px;
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-ui: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+:root[data-theme="dark"] {
+  --paper: #14130f;
+  --surface: #1c1b16;
+  --surface-2: #232219;
+  --ink: #f2eee4;
+  --ink-soft: #d6d2c6;
+  --muted: #a29e90;
+  --line: #302e26;
+  --line-strong: #3c3a2f;
+  --accent: #5fbe8e;
+  --accent-solid: #3dbb86;
+  --accent-ink: #0e1a12;
+  --accent-wash: #1b241e;
+  --danger: #f0a6a0;
+  --focus: #5fbe8e;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-lift: 0 22px 46px -26px rgba(0, 0, 0, 0.7);
+}
+* { box-sizing: border-box; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; }
+button { font-family: inherit; }
+h1, h2, h3, h4 { margin: 0; font-family: var(--font-display); font-weight: 550; line-height: 1.1; letter-spacing: -0.01em; }
+p { margin: 0; }
+.tnum { font-variant-numeric: tabular-nums; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+.label { font-family: var(--font-ui); font-size: 0.82rem; font-weight: 600; color: var(--muted); }
+
+/* ---------- Buttons / inputs (from globals.css) ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 44px; padding: 0 18px; border-radius: var(--r-btn);
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink);
+  font-weight: 600; font-size: 0.92rem; cursor: pointer;
+  transition: background .16s ease, border-color .16s ease, color .16s ease, transform .12s ease;
+}
+.btn:hover { border-color: var(--ink); }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+.btn-primary { background: var(--accent-solid); color: var(--accent-ink); border-color: transparent; }
+.btn-primary:hover:not(:disabled) { background: var(--ink); color: var(--surface); }
+:root[data-theme="dark"] .btn-primary:hover:not(:disabled) { background: var(--surface); color: var(--ink); }
+.btn-quiet { background: transparent; }
+.btn-danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
+.btn-danger:hover { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 8%, transparent); }
+.btn-sm { min-height: 36px; padding: 0 13px; font-size: 0.83rem; }
+.icon-btn {
+  width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line-strong);
+  background: var(--surface); color: var(--ink); display: grid; place-items: center; cursor: pointer;
+  transition: border-color .15s ease;
+}
+.icon-btn:hover { border-color: var(--ink); }
+.field { display: flex; flex-direction: column; gap: 7px; }
+.field label { font-size: 0.86rem; font-weight: 600; color: var(--ink-soft); }
+.input, select.input {
+  width: 100%; min-height: 46px; padding: 0 14px; border-radius: var(--r-input);
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink);
+  font-family: var(--font-ui); font-size: 0.95rem;
+}
+.input:focus { outline: none; border-color: var(--accent-solid); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-solid) 22%, transparent); }
+.input[aria-invalid="true"] { border-color: var(--danger); }
+.amount-field { position: relative; }
+.amount-field .cur { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 0.95rem; font-weight: 600; color: var(--muted); pointer-events: none; }
+.amount-field .input { padding-left: 38px; font-variant-numeric: tabular-nums; }
+.field-error { font-size: 0.82rem; color: var(--danger); font-weight: 600; }
+.field-hint { font-size: 0.82rem; color: var(--muted); }
+.textlink { color: var(--accent); font-weight: 600; border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
+
+/* ---------- Chip vocabulary — one neutral chip, one hatch flag,
+   one danger chip. Reason (R-31): DESIGN.md forbids decorative
+   capsule badges and color-only status, so account type, draft,
+   and posted all read as plain bordered text; red is reserved for
+   void/over-budget and always paired with words. ---------- */
+.chip {
+  display: inline-flex; align-items: center; font-size: 0.74rem; font-weight: 600;
+  color: var(--muted); border: 1px solid var(--line-strong); border-radius: var(--r-chip);
+  padding: 3px 10px; white-space: nowrap;
+}
+.chip-flag {
+  font-size: 0.72rem; font-weight: 700; color: var(--ink-soft); border-radius: var(--r-chip);
+  padding: 3px 10px; border: 1px solid var(--line-strong);
+  background-image: repeating-linear-gradient(135deg, var(--line-strong) 0, var(--line-strong) 1px, transparent 1px, transparent 6px);
+}
+.chip-danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
+.count-badge {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px;
+  padding: 0 6px; border-radius: var(--r-chip); background: var(--surface-2); border: 1px solid var(--line-strong);
+  color: var(--muted); font-size: 0.72rem; font-weight: 700;
+}
+
+/* ---------- App shell (from globals.css) ---------- */
+.app-shell { min-height: 100%; display: grid; grid-template-columns: 240px 1fr; border: 1px solid var(--line); border-radius: var(--r-panel); overflow: hidden; background: var(--paper); }
+.app-sidebar { border-right: 1px solid var(--line); background: var(--surface-2); padding: 16px 12px; display: flex; flex-direction: column; }
+.app-brand-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 4px 20px 8px; }
+.brand { display: inline-flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 600; font-size: 1.1rem; color: var(--ink); }
+.brand-mark { display: grid; place-items: center; width: 24px; height: 24px; color: var(--surface); background: var(--ink); border-radius: 7px; }
+:root[data-theme="dark"] .brand-mark { background: var(--accent-solid); color: var(--accent-ink); }
+.app-nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.app-nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border-radius: 10px; color: var(--ink-soft); font-size: 0.9rem; font-weight: 500; text-decoration: none; }
+.app-nav-item svg { flex: none; color: var(--muted); }
+.app-nav-item:hover { background: var(--surface); color: var(--ink); }
+.app-nav-item.is-active { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: var(--shadow-card); }
+.app-nav-item.is-active svg { color: var(--accent); }
+.app-nav-tag { margin-left: auto; font-size: 0.66rem; font-weight: 600; color: var(--muted); border: 1px solid var(--line-strong); border-radius: var(--r-chip); padding: 2px 7px; }
+.app-sidebar-foot { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 10px; display: flex; align-items: center; gap: 9px; padding-left: 4px; font-size: 0.85rem; font-weight: 600; color: var(--ink); }
+.app-avatar { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: var(--accent-wash); color: var(--accent); }
+.app-main { min-width: 0; display: flex; flex-direction: column; }
+.app-topbar { display: none; align-items: center; gap: 12px; height: 54px; padding: 0 14px; background: var(--surface-2); border-bottom: 1px solid var(--line); }
+.app-topbar-title { font-family: var(--font-display); font-weight: 600; font-size: 1rem; }
+.app-content { padding: 24px clamp(16px, 4vw, 32px) 32px; }
+.page-head { margin-bottom: 18px; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.page-head h1 { font-size: 1.7rem; }
+.sample-tag { font-size: 0.72rem; font-weight: 600; color: var(--muted); border: 1px solid var(--line); border-radius: var(--r-chip); padding: 3px 9px; }
+
+/* ---------- Sub-nav for the Finance routes (Accounts / Transactions
+   / Budgets). These are the real /finance/* routes (R-24), presented
+   as one segmented control, not invented tabs. ---------- */
+.seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 10px; padding: 3px; gap: 2px; background: var(--surface); }
+.seg button { border: none; background: transparent; padding: 7px 14px; border-radius: 7px; font-size: 0.85rem; font-weight: 600; color: var(--muted); cursor: pointer; }
+.seg button[aria-selected="true"] { background: var(--surface-2); color: var(--ink); box-shadow: var(--shadow-card); }
+.toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-bottom: 16px; margin-bottom: 6px; }
+.filter-chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line-strong); border-radius: var(--r-chip); padding: 7px 12px; font-size: 0.82rem; font-weight: 600; color: var(--ink-soft); background: var(--surface); cursor: default; }
+.filter-chip .care { color: var(--muted); font-size: 0.7rem; }
+.toolbar .spacer { flex: 1; }
+.ref-only { font-size: 0.7rem; font-weight: 600; color: var(--muted); }
+
+/* ---------- Finance: accounts summary ---------- */
+.fin-summary { display: flex; justify-content: space-between; align-items: flex-end; gap: 22px; flex-wrap: wrap; padding: 4px 0 20px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+.fin-total-label { font-size: 0.82rem; font-weight: 600; color: var(--muted); }
+/* The one editorial number per screen — Fraunces + the single green
+   accent (green = money, per the Monarch reference). This is the
+   focal point and the identity motif, not decoration. */
+.fin-total { font-family: var(--font-display); font-weight: 550; font-size: clamp(2.1rem, 5.5vw, 3rem); color: var(--accent); line-height: 1; letter-spacing: -0.015em; margin-top: 8px; }
+.fin-total .cur { font-family: var(--font-ui); font-size: 1.05rem; font-weight: 600; color: var(--muted); margin-right: 6px; vertical-align: 0.35em; }
+.fin-note { font-size: 0.8rem; color: var(--muted); margin-top: 9px; max-width: 44ch; }
+.fin-summary-side { text-align: right; }
+.fin-mini { font-size: 0.82rem; color: var(--muted); }
+.fin-mini b { color: var(--ink); font-weight: 700; }
+
+.fin-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 28px 0 4px; }
+.fin-section-head h2 { font-size: 1.05rem; }
+
+/* ---------- Finance: account list ---------- */
+.acct-list { border-top: 1px solid var(--line); }
+.acct-row { display: flex; align-items: center; gap: 14px; padding: 15px 2px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.acct-ic { width: 38px; height: 38px; border-radius: 11px; border: 1px solid var(--line); background: var(--surface-2); color: var(--muted); display: grid; place-items: center; flex: none; }
+.acct-main { flex: 1; min-width: 170px; }
+.acct-name { font-size: 0.95rem; font-weight: 600; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.acct-open { font-size: 0.8rem; color: var(--muted); margin-top: 3px; }
+.acct-bal { font-weight: 700; font-size: 1rem; text-align: right; min-width: 116px; }
+.acct-actions { display: flex; gap: 8px; }
+.acct-row.is-archived { opacity: 0.62; }
+
+/* ---------- Finance: categories ---------- */
+.cat-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; margin-top: 6px; }
+.cat-col h4 { font-size: 0.8rem; font-weight: 700; color: var(--ink-soft); margin: 0 0 8px; }
+.cat-list { border-top: 1px solid var(--line); }
+.cat-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 2px; border-bottom: 1px solid var(--line); font-size: 0.9rem; font-weight: 500; }
+
+/* ---------- Finance: transaction ledger ---------- */
+.led-note { font-size: 0.8rem; color: var(--muted); margin: 4px 0 14px; }
+.led-date { font-size: 0.82rem; font-weight: 700; color: var(--ink-soft); margin: 20px 0 2px; }
+.ledger { border-top: 1px solid var(--line); }
+.led-row { display: flex; align-items: center; gap: 14px; padding: 13px 2px; border-bottom: 1px solid var(--line); width: 100%; text-align: left; background: none; border-left: none; border-right: none; border-top: none; color: inherit; font-family: inherit; cursor: pointer; }
+.led-row:hover { background: var(--surface-2); }
+.led-ic { width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); color: var(--muted); display: grid; place-items: center; flex: none; }
+.led-body { flex: 1; min-width: 0; }
+.led-title { font-size: 0.92rem; font-weight: 600; }
+.led-sub { font-size: 0.8rem; color: var(--muted); margin-top: 2px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.led-amt { font-weight: 700; font-size: 0.95rem; text-align: right; white-space: nowrap; }
+.amt-in { color: var(--accent); }
+.amt-out { color: var(--ink); }
+.amt-neutral { color: var(--ink-soft); }
+.led-row.is-void .led-title, .led-row.is-void .led-amt { text-decoration: line-through; color: var(--muted); }
+.led-row.is-draft .led-amt { color: var(--muted); }
+
+/* ---------- Finance: budgets ---------- */
+.budget-month { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+.budget-list { border-top: 1px solid var(--line); }
+.budget-row { padding: 16px 2px; border-bottom: 1px solid var(--line); }
+.budget-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; margin-bottom: 10px; flex-wrap: wrap; }
+.budget-name { font-weight: 600; font-size: 0.92rem; display: flex; align-items: center; gap: 8px; }
+.budget-nums { font-size: 0.85rem; color: var(--muted); }
+.budget-nums .spent { font-weight: 700; color: var(--ink); }
+.budget-bar { height: 10px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); overflow: hidden; }
+.budget-fill { height: 100%; background: var(--accent-solid); border-radius: 999px 0 0 999px; }
+.budget-row.is-over .budget-nums .spent { color: var(--danger); }
+/* Over budget = the same hatch motif used for "needs attention"
+   elsewhere (Overdue tasks, schedule overlap), plus the words
+   "Over budget" and a danger-toned number. Never red fill alone. */
+.budget-fill.is-over { background: var(--danger); border-radius: 999px; background-image: repeating-linear-gradient(135deg, rgba(255,255,255,0.4) 0, rgba(255,255,255,0.4) 2px, transparent 2px, transparent 7px); }
+
+/* ---------- Empty / loading / offline ---------- */
+.empty-state { text-align: center; max-width: 360px; margin: 44px auto; }
+.empty-state .es-ic { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; margin: 0 auto 18px; background: var(--surface-2); border: 1px solid var(--line); color: var(--muted); }
+.empty-state h3 { font-size: 1.3rem; }
+.empty-state p { margin-top: 10px; color: var(--ink-soft); font-size: 0.92rem; }
+.empty-state .btn { margin-top: 18px; }
+.skeleton-row { height: 44px; border-radius: 8px; background: linear-gradient(90deg, var(--surface-2) 25%, var(--line) 37%, var(--surface-2) 63%); background-size: 400% 100%; animation: shimmer 1.4s ease infinite; margin-top: 10px; }
+.skeleton-row:first-child { margin-top: 0; }
+@keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+.banner { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--surface-2); font-size: 0.86rem; color: var(--ink-soft); font-weight: 500; }
+.banner svg { color: var(--muted); flex: none; }
+
+/* ---------- Modal ---------- */
+.modal-scrim { position: fixed; inset: 0; z-index: 200; background: rgba(20,19,15,.42); display: none; align-items: center; justify-content: center; padding: 20px; }
+.modal-scrim.is-open { display: flex; }
+.modal-panel { width: 100%; max-width: 460px; max-height: calc(100vh - 40px); overflow-y: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-panel); box-shadow: var(--shadow-lift); padding: 24px; }
+.modal-panel:focus { outline: none; }
+.modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+.modal-head h2 { font-size: 1.1rem; }
+.modal-foot { display: flex; gap: 10px; margin-top: 20px; }
+.modal-foot .btn { flex: 1; }
+.form-alert { border-radius: 10px; padding: 11px 13px; font-size: 0.86rem; font-weight: 500; background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent); }
+.form-row { display: flex; gap: 12px; }
+.form-row .field { flex: 1; min-width: 0; }
+
+/* Transfer effect preview */
+.effect-box { border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); padding: 12px 14px; margin-top: 4px; }
+.effect-box .eb-label { font-size: 0.76rem; font-weight: 700; color: var(--ink-soft); text-transform: none; margin-bottom: 6px; }
+.effect-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 0.86rem; padding: 4px 0; }
+.effect-row .er-name { color: var(--ink-soft); font-weight: 600; }
+.effect-row .er-val { color: var(--muted); }
+.effect-row .er-val b { color: var(--ink); font-weight: 700; }
+
+/* Transaction detail */
+.detail-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.detail-amt { font-family: var(--font-display); font-size: 1.6rem; font-weight: 550; margin-bottom: 6px; }
+.detail-desc { color: var(--ink-soft); font-size: 0.9rem; }
+.detail-section { margin-top: 16px; }
+.detail-section > label { display: block; font-size: 0.82rem; font-weight: 600; color: var(--ink-soft); margin-bottom: 8px; }
+.rev-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 0.86rem; }
+.rev-row:last-child { border-bottom: none; }
+.rev-row .rv-k { font-weight: 600; }
+.rev-row .rv-t { color: var(--muted); }
+.detail-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 18px; }
+.confirm-block { border: 1px solid color-mix(in srgb, var(--danger) 32%, transparent); background: color-mix(in srgb, var(--danger) 8%, transparent); border-radius: 12px; padding: 13px 15px; margin-top: 14px; }
+.confirm-block p { font-size: 0.85rem; color: var(--ink-soft); }
+.confirm-actions { display: flex; gap: 8px; margin-top: 12px; }
+
+/* ---------- Layout scaffolding for this document ---------- */
+.page-wrap { max-width: 1180px; margin: 0 auto; padding: 0 20px 90px; }
+.doc-head { padding: 40px 0 30px; border-bottom: 1px solid var(--line); margin-bottom: 40px; display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+.doc-head h1 { font-size: clamp(1.8rem, 3.4vw, 2.4rem); max-width: 20ch; }
+.doc-head .lede { margin-top: 12px; color: var(--ink-soft); max-width: 64ch; font-size: 0.98rem; }
+.doc-head .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.frame-block { margin-bottom: 56px; }
+.frame-label { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.frame-label .fl-no { font-family: var(--font-display); font-size: 1.1rem; color: var(--muted); }
+.frame-label h2 { font-size: 1.2rem; }
+.frame-label .fl-note { font-size: 0.84rem; color: var(--muted); }
+.frame-shell { border-radius: var(--r-panel); box-shadow: var(--shadow-card); }
+.note { margin-top: 14px; padding: 12px 16px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line); font-size: 0.84rem; color: var(--ink-soft); }
+.note b { color: var(--ink); }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+.closing-notes { margin-top: 60px; padding-top: 40px; border-top: 1px solid var(--line); }
+.closing-notes h2 { font-size: 1.5rem; }
+.closing-notes ul { margin: 18px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 32px; }
+.closing-notes li { font-size: 0.9rem; color: var(--ink-soft); padding: 10px 0; border-top: 1px solid var(--line); }
+.closing-notes li b { color: var(--ink); font-weight: 600; }
+
+/* ---------- Explicit mobile preview (fixed width, forced mobile rules) ---------- */
+.frame-mobile { width: 380px; max-width: 100%; }
+.frame-mobile .app-shell { display: block; border-radius: var(--r-panel); }
+.frame-mobile .app-sidebar { display: none; }
+.frame-mobile .app-topbar { display: flex; }
+.frame-mobile .app-content { padding: 18px 16px 28px; }
+.frame-mobile .toolbar { flex-direction: column; align-items: stretch; }
+.frame-mobile .seg { width: 100%; }
+.frame-mobile .seg button { flex: 1; }
+.frame-mobile .toolbar .spacer { display: none; }
+.frame-mobile .fin-summary { flex-direction: column; align-items: flex-start; gap: 4px; }
+.frame-mobile .fin-summary-side { text-align: left; }
+
+/* ---------- Real responsiveness for the whole document ---------- */
+@media (max-width: 860px) {
+  .app-shell { grid-template-columns: 1fr; }
+  .app-sidebar { display: none; }
+  .app-topbar { display: flex; }
+  .cat-cols { grid-template-columns: 1fr; gap: 16px; }
+  .two-col { grid-template-columns: 1fr; }
+  .closing-notes ul { grid-template-columns: 1fr; }
+  .doc-head { padding-top: 24px; }
+}
+@media (max-width: 560px) {
+  .toolbar { flex-direction: column; align-items: stretch; }
+  .toolbar .spacer { display: none; }
+  .fin-summary { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .fin-summary-side { text-align: left; }
+  .form-row { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <header class="doc-head">
+    <div>
+      <span class="label">Hi-fi design reference &middot; not shipped code</span>
+      <h1>Finance: accounts, ledger, budgets</h1>
+      <p class="lede">
+        Built on <a class="textlink" href="tracker-wireframe.html">tracker-wireframe.html</a> (structure), <a class="textlink" href="PRD.md">PRD.md</a> REQ-08 to REQ-11 and
+        <a class="textlink" href="SCHEMA.md">SCHEMA.md</a> (finance rules: computed balance, drafts, void, revisions), and <a class="textlink" href="DESIGN.md">DESIGN.md</a>
+        (the "quiet ledger" identity already shipped on the landing page). Tokens, type, and components are copied from <code>globals.css</code>, not reinvented.
+      </p>
+      <div class="meta">
+        <span class="chip">Dial: ENERGY 2 / RHYTHM 2 / MOTION 1</span>
+        <span class="chip">Ref: Mobbin (Monarch, Copilot Money)</span>
+        <span class="chip">Palette: 2 core + 1 accent (unchanged)</span>
+      </div>
+    </div>
+    <button class="icon-btn" id="theme-btn" type="button" aria-label="Switch to dark theme" title="Dark theme">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6.4 6.4 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+    </button>
+  </header>
+
+  <div class="note" style="margin-bottom:48px">
+    <b>How to read this file.</b> The theme toggle, the Accounts / Transactions / Budgets sub-nav, all four modals (New transaction,
+    Transfer, Correct opening balance, transaction detail), the income/expense type switch inside the transaction form, and the
+    "Void" confirmation are real and keyboard-operable. Filter chips and the month picker are shown as reference only: they look
+    and focus like the real control but are not wired to data, since Finance has no backend yet (<a class="textlink" href="PLAN.md">PLAN.md</a>, M3). Every figure is
+    synthetic and labelled "Sample data" (R-17).
+  </div>
+
+  <!-- ================= FRAME 1: FINANCE WORKSPACE ================= -->
+  <div class="frame-block">
+    <div class="frame-label">
+      <span class="fl-no">01</span>
+      <h2>Finance: Accounts, Transactions, Budgets</h2>
+      <span class="fl-note">One module, three real routes (REQ-08 to REQ-11)</span>
+    </div>
+
+    <div class="frame-shell">
+      <div class="app-shell">
+        <aside class="app-sidebar">
+          <div class="app-brand-row">
+            <span class="brand"><span class="brand-mark"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Tracker</span>
+          </div>
+          <nav class="app-nav" aria-label="Primary">
+            <a class="app-nav-item" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 11 9-8 9 8"/><path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"/></svg>Dashboard</a>
+            <a class="app-nav-item" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-6"/><path d="m9 11 3 3L22 4"/></svg>Tasks</a>
+            <a class="app-nav-item" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>Habits</a>
+            <a class="app-nav-item" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Pomodoro</a>
+            <a class="app-nav-item" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 5v11"/><path d="M12 5v6"/><path d="M18 5v14"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg>Projects<span class="app-nav-tag">Soon</span></a>
+            <a class="app-nav-item is-active" href="#" aria-current="page"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5"/><path d="M16 12h.01"/></svg>Finance</a>
+          </nav>
+          <div class="app-sidebar-foot"><span class="app-avatar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg></span>Budi S.</div>
+        </aside>
+
+        <div class="app-main">
+          <div class="app-topbar">
+            <button class="icon-btn" type="button" aria-label="Open menu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+            <span class="app-topbar-title">Finance</span>
+          </div>
+
+          <main class="app-content">
+            <div class="page-head">
+              <h1>Finance</h1>
+              <span class="sample-tag">Sample data</span>
+            </div>
+
+            <div class="toolbar" style="border-bottom:1px solid var(--line)">
+              <div class="seg" role="tablist" aria-label="Finance section">
+                <button role="tab" aria-selected="true" data-tab="accounts">Accounts</button>
+                <button role="tab" aria-selected="false" data-tab="transactions">Transactions</button>
+                <button role="tab" aria-selected="false" data-tab="budgets">Budgets</button>
+              </div>
+            </div>
+
+            <!-- ACCOUNTS PANEL -->
+            <div id="panel-accounts" data-panel>
+              <div class="fin-summary">
+                <div>
+                  <div class="fin-total-label">Total across 3 active accounts</div>
+                  <div class="fin-total tnum"><span class="cur">Rp</span>5,290,000</div>
+                  <p class="fin-note">Computed from posted transactions. Excludes drafts and transfers between your own accounts, which never change your total.</p>
+                </div>
+                <div class="fin-summary-side">
+                  <div class="fin-mini">This month, posted</div>
+                  <div class="fin-mini" style="margin-top:6px">In <b class="tnum">Rp 8,000,000</b></div>
+                  <div class="fin-mini">Out <b class="tnum">Rp 195,000</b></div>
+                </div>
+              </div>
+
+              <div class="fin-section-head">
+                <h2>Accounts</h2>
+                <button class="btn btn-primary btn-sm" type="button" data-open-modal="modal-new-account">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> New account
+                </button>
+              </div>
+              <div class="acct-list">
+                <div class="acct-row">
+                  <span class="acct-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/></svg></span>
+                  <div class="acct-main">
+                    <div class="acct-name">BCA <span class="chip">Bank</span></div>
+                    <div class="acct-open">Opening balance Rp 3,500,000</div>
+                  </div>
+                  <div class="acct-bal tnum">Rp 4,120,000</div>
+                  <div class="acct-actions">
+                    <button class="btn btn-sm" type="button" data-open-modal="modal-opening-balance">Correct opening balance</button>
+                  </div>
+                </div>
+                <div class="acct-row">
+                  <span class="acct-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg></span>
+                  <div class="acct-main">
+                    <div class="acct-name">Dana <span class="chip">E-wallet</span></div>
+                    <div class="acct-open">Opening balance Rp 1,000,000</div>
+                  </div>
+                  <div class="acct-bal tnum">Rp 850,000</div>
+                  <div class="acct-actions">
+                    <button class="btn btn-sm" type="button" data-open-modal="modal-opening-balance">Correct opening balance</button>
+                  </div>
+                </div>
+                <div class="acct-row">
+                  <span class="acct-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg></span>
+                  <div class="acct-main">
+                    <div class="acct-name">Cash <span class="chip">Cash</span></div>
+                    <div class="acct-open">Opening balance Rp 500,000</div>
+                  </div>
+                  <div class="acct-bal tnum">Rp 320,000</div>
+                  <div class="acct-actions">
+                    <button class="btn btn-sm" type="button" data-open-modal="modal-opening-balance">Correct opening balance</button>
+                  </div>
+                </div>
+                <div class="acct-row is-archived">
+                  <span class="acct-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/></svg></span>
+                  <div class="acct-main">
+                    <div class="acct-name">Jenius <span class="chip">Bank</span> <span class="chip">Archived</span></div>
+                    <div class="acct-open">Kept for its transaction history; not offered for new transactions.</div>
+                  </div>
+                  <div class="acct-bal tnum">Rp 0</div>
+                  <div class="acct-actions">
+                    <button class="btn btn-sm" type="button">Unarchive</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="fin-section-head">
+                <h2>Categories</h2>
+                <span class="ref-only">Income and expense are separate; type can't change after a category is created.</span>
+              </div>
+              <div class="cat-cols">
+                <div class="cat-col">
+                  <h4>Income</h4>
+                  <div class="cat-list">
+                    <div class="cat-row">Salary <button class="btn btn-sm btn-quiet" type="button">Archive</button></div>
+                    <div class="cat-row">Freelance <button class="btn btn-sm btn-quiet" type="button">Archive</button></div>
+                    <div class="cat-row" style="opacity:.62">Bonus <span class="chip">Archived</span></div>
+                  </div>
+                </div>
+                <div class="cat-col">
+                  <h4>Expense</h4>
+                  <div class="cat-list">
+                    <div class="cat-row">Food &amp; Drink <button class="btn btn-sm btn-quiet" type="button">Archive</button></div>
+                    <div class="cat-row">Transport <button class="btn btn-sm btn-quiet" type="button">Archive</button></div>
+                    <div class="cat-row">Utilities <button class="btn btn-sm btn-quiet" type="button">Archive</button></div>
+                    <div class="cat-row">Subscriptions <button class="btn btn-sm btn-quiet" type="button">Archive</button></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- TRANSACTIONS PANEL -->
+            <div id="panel-transactions" data-panel hidden>
+              <div class="toolbar">
+                <span class="filter-chip">Account: All <span class="care">&#9662;</span></span>
+                <span class="filter-chip">Type: All <span class="care">&#9662;</span></span>
+                <span class="filter-chip">Category <span class="care">&#9662;</span></span>
+                <span class="filter-chip">Sep 2026 <span class="care">&#9662;</span></span>
+                <span class="spacer"></span>
+                <span class="ref-only">Filters: reference only</span>
+                <button class="btn btn-sm" type="button" data-open-modal="modal-transfer">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 6h18"/><path d="m7 22-4-4 4-4"/><path d="M21 18H3"/></svg> Transfer
+                </button>
+                <button class="btn btn-primary btn-sm" type="button" data-open-modal="modal-new-tx">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> New transaction
+                </button>
+              </div>
+              <p class="led-note">Balances and reports read your current, corrected transactions, so a later correction or void changes past periods on purpose.</p>
+
+              <div class="led-date">16 September 2026</div>
+              <div class="ledger">
+                <button class="led-row" type="button" data-open-modal="modal-tx-detail">
+                  <span class="led-ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></span>
+                  <span class="led-body">
+                    <span class="led-title">Food &amp; Drink</span>
+                    <span class="led-sub">BCA <span aria-hidden="true">&middot;</span> Expense</span>
+                  </span>
+                  <span class="led-amt amt-out tnum">&minus; Rp 150,000</span>
+                </button>
+                <button class="led-row" type="button">
+                  <span class="led-ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 17H7V7"/><path d="M17 7 7 17"/></svg></span>
+                  <span class="led-body">
+                    <span class="led-title">Salary</span>
+                    <span class="led-sub">BCA <span aria-hidden="true">&middot;</span> Income</span>
+                  </span>
+                  <span class="led-amt amt-in tnum">+ Rp 8,000,000</span>
+                </button>
+              </div>
+
+              <div class="led-date">15 September 2026</div>
+              <div class="ledger">
+                <button class="led-row" type="button">
+                  <span class="led-ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 6h18"/><path d="m7 22-4-4 4-4"/><path d="M21 18H3"/></svg></span>
+                  <span class="led-body">
+                    <span class="led-title">Transfer: BCA &rarr; Dana</span>
+                    <span class="led-sub">Moves between your accounts <span aria-hidden="true">&middot;</span> not income or expense</span>
+                  </span>
+                  <span class="led-amt amt-neutral tnum">Rp 500,000</span>
+                </button>
+                <button class="led-row" type="button">
+                  <span class="led-ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></span>
+                  <span class="led-body">
+                    <span class="led-title">Transport</span>
+                    <span class="led-sub">Dana <span aria-hidden="true">&middot;</span> Expense</span>
+                  </span>
+                  <span class="led-amt amt-out tnum">&minus; Rp 45,000</span>
+                </button>
+              </div>
+
+              <div class="led-date">14 September 2026</div>
+              <div class="ledger">
+                <button class="led-row is-draft" type="button" data-open-modal="modal-tx-draft">
+                  <span class="led-ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></span>
+                  <span class="led-body">
+                    <span class="led-title">Subscriptions</span>
+                    <span class="led-sub">BCA <span class="chip">Draft, not in balance yet</span> <span class="chip">From recurring rule</span></span>
+                  </span>
+                  <span class="led-amt tnum">Rp 99,000</span>
+                </button>
+                <button class="led-row is-void" type="button">
+                  <span class="led-ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></span>
+                  <span class="led-body">
+                    <span class="led-title">Utilities</span>
+                    <span class="led-sub"><span class="chip-danger">Void</span> Kept for history; removed from your balance</span>
+                  </span>
+                  <span class="led-amt tnum">Rp 320,000</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- BUDGETS PANEL -->
+            <div id="panel-budgets" data-panel hidden>
+              <div class="fin-section-head" style="margin-top:8px">
+                <div class="budget-month">
+                  <span class="filter-chip">September 2026 <span class="care">&#9662;</span></span>
+                  <span class="ref-only">Month picker: reference only</span>
+                </div>
+                <button class="btn btn-primary btn-sm" type="button" data-open-modal="modal-new-tx" aria-hidden="true" tabindex="-1" style="visibility:hidden">spacer</button>
+              </div>
+              <div class="budget-list">
+                <div class="budget-row">
+                  <div class="budget-head">
+                    <span class="budget-name">Food &amp; Drink</span>
+                    <span class="budget-nums"><span class="spent tnum">Rp 1,240,000</span> of <span class="tnum">Rp 1,500,000</span></span>
+                  </div>
+                  <div class="budget-bar"><div class="budget-fill" style="width:83%"></div></div>
+                </div>
+                <div class="budget-row">
+                  <div class="budget-head">
+                    <span class="budget-name">Transport</span>
+                    <span class="budget-nums"><span class="spent tnum">Rp 480,000</span> of <span class="tnum">Rp 600,000</span></span>
+                  </div>
+                  <div class="budget-bar"><div class="budget-fill" style="width:80%"></div></div>
+                </div>
+                <div class="budget-row is-over">
+                  <div class="budget-head">
+                    <span class="budget-name">Subscriptions <span class="chip-flag">Over budget</span></span>
+                    <span class="budget-nums"><span class="spent tnum">Rp 210,000</span> of <span class="tnum">Rp 150,000</span> <span style="color:var(--danger);font-weight:700">&middot; over by Rp 60,000</span></span>
+                  </div>
+                  <div class="budget-bar"><div class="budget-fill is-over" style="width:100%"></div></div>
+                </div>
+                <div class="budget-row">
+                  <div class="budget-head">
+                    <span class="budget-name">Utilities</span>
+                    <span class="budget-nums"><span class="spent tnum">Rp 320,000</span> of <span class="tnum">Rp 700,000</span></span>
+                  </div>
+                  <div class="budget-bar"><div class="budget-fill" style="width:46%"></div></div>
+                </div>
+              </div>
+              <div class="fin-section-head">
+                <span class="field-hint">Actuals come from posted expenses in the selected month. Drafts and voids are excluded.</span>
+                <button class="btn btn-sm" type="button" data-open-modal="modal-new-tx" style="visibility:hidden">hidden</button>
+              </div>
+            </div>
+
+          </main>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= FRAME 2: STATES ================= -->
+  <div class="frame-block">
+    <div class="frame-label">
+      <span class="fl-no">02</span>
+      <h2>Empty, loading, and offline states</h2>
+      <span class="fl-note">R-27 / UX-FLOWS: every data view ships all three</span>
+    </div>
+    <div class="two-col">
+      <div class="frame-shell" style="border:1px solid var(--line);border-radius:var(--r-panel);padding:8px;background:var(--surface)">
+        <div class="empty-state">
+          <span class="es-ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5"/><path d="M16 12h.01"/></svg></span>
+          <h3>No accounts yet</h3>
+          <p>Add a cash, bank, or e-wallet account with its opening balance. Your total balance is then computed from the transactions you record.</p>
+          <button class="btn btn-primary" type="button" data-open-modal="modal-new-account">Add your first account</button>
+        </div>
+      </div>
+      <div>
+        <div class="frame-shell" style="border:1px solid var(--line);border-radius:var(--r-panel);padding:20px;background:var(--surface)">
+          <p class="field-hint" style="margin-bottom:4px">Loading transactions&hellip;</p>
+          <div class="skeleton-row"></div>
+          <div class="skeleton-row"></div>
+          <div class="skeleton-row"></div>
+        </div>
+        <div class="banner" style="margin-top:16px">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1l22 22"/><path d="M16.7 13.7A5 5 0 0 0 12 11c-.6 0-1.2.1-1.7.3"/><path d="M5 12.5a10 10 0 0 1 4-2.6"/><path d="M2 8.8A15 15 0 0 1 8 6"/><path d="M19.9 8.9A15 15 0 0 0 15 6.2"/><path d="M12 20h.01"/></svg>
+          <span><b style="color:var(--ink)">You're offline.</b> Showing your last loaded data. Saving is paused until the connection returns, so nothing is marked done by mistake.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= FRAME 3: MOBILE ================= -->
+  <div class="frame-block">
+    <div class="frame-label">
+      <span class="fl-no">03</span>
+      <h2>Mobile: 380px</h2>
+      <span class="fl-note">Forced mobile rules, not a squeezed desktop (R-03)</span>
+    </div>
+    <div class="frame-mobile frame-shell" style="border:1px solid var(--line);overflow:hidden">
+      <div class="app-shell">
+        <div class="app-main">
+          <div class="app-topbar">
+            <button class="icon-btn" type="button" aria-label="Open menu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+            <span class="app-topbar-title">Finance</span>
+          </div>
+          <main class="app-content">
+            <div class="page-head"><h1 style="font-size:1.35rem">Finance</h1><span class="sample-tag">Sample data</span></div>
+            <div class="seg" role="tablist" aria-label="Finance section (mobile)" style="width:100%;margin-bottom:14px">
+              <button role="tab" aria-selected="false" style="flex:1">Accounts</button>
+              <button role="tab" aria-selected="true" style="flex:1">Transactions</button>
+              <button role="tab" aria-selected="false" style="flex:1">Budgets</button>
+            </div>
+            <p class="led-note" style="margin-top:0">Based on your current corrected transactions.</p>
+            <div class="led-date" style="margin-top:8px">16 September 2026</div>
+            <div class="ledger">
+              <div class="led-row" style="cursor:default">
+                <span class="led-ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 17H7V7"/><path d="M17 7 7 17"/></svg></span>
+                <span class="led-body"><span class="led-title">Salary</span><span class="led-sub">BCA <span aria-hidden="true">&middot;</span> Income</span></span>
+                <span class="led-amt amt-in tnum">+ Rp 8,000,000</span>
+              </div>
+              <div class="led-row" style="cursor:default">
+                <span class="led-ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></span>
+                <span class="led-body"><span class="led-title">Food &amp; Drink</span><span class="led-sub">BCA <span aria-hidden="true">&middot;</span> Expense</span></span>
+                <span class="led-amt amt-out tnum">&minus; Rp 150,000</span>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="closing-notes">
+    <h2>Reasoning, written down (R-31)</h2>
+    <ul>
+      <li><b>Green means money in, nothing else.</b> Income amounts and the total balance carry the one green accent (Monarch's "green for money" cue). Expenses stay in ink with a leading minus, transfers stay neutral: colour marks direction, never decoration.</li>
+      <li><b>Red is danger, not "expense".</b> An everyday expense is neutral; red appears only on Void and Over budget, and always with the words next to it plus a hatch, so status never rides on colour alone (R-25, UX-FLOWS).</li>
+      <li><b>One big Fraunces number.</b> The total balance is the single editorial figure on the screen, the same identity motif used for the Dashboard's headline number and the Tasks section markers.</li>
+      <li><b>Drafts and transfers are excluded, in words.</b> The line under the total says so, and a draft row is labelled "Draft, not in balance yet", matching the rule that drafts don't move the balance (SCHEMA).</li>
+      <li><b>Opening-balance correction is append-only.</b> The modal shows the immutable change log and states it isn't income, mirroring FinanceAccountBalanceChange rather than overwriting a field.</li>
+      <li><b>Void keeps the record.</b> The confirm step explains the balance recomputes and the row can't be edited or reposted; the voided row stays visible, struck through, not deleted.</li>
+      <li><b>Tabular numbers everywhere money appears.</b> Inter tabular-nums aligns the IDR column (Monarch's tidy-number reference); Fraunces is kept for headings and the one total.</li>
+      <li><b>Sub-nav mirrors real routes.</b> Accounts, Transactions, and Budgets are the actual /finance/* pages, so no nav item points at a screen that doesn't exist (R-24).</li>
+    </ul>
+  </div>
+
+</div>
+
+<!-- ================= MODAL: NEW TRANSACTION ================= -->
+<div class="modal-scrim" id="modal-new-tx" data-modal>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="ntx-title" tabindex="-1">
+    <div class="modal-head">
+      <h2 id="ntx-title">New transaction</h2>
+      <button class="icon-btn" type="button" aria-label="Close" data-close-modal>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form id="new-tx-form" novalidate>
+      <div id="ntx-error" class="form-alert" role="alert" style="display:none;margin-bottom:14px">Enter an amount greater than zero.</div>
+      <div class="field" style="margin-bottom:14px">
+        <label>Type</label>
+        <div class="seg" role="tablist" aria-label="Transaction type" id="ntx-type">
+          <button type="button" role="tab" aria-selected="true" data-txtype="expense">Expense</button>
+          <button type="button" role="tab" aria-selected="false" data-txtype="income">Income</button>
+        </div>
+        <span class="field-hint">Moving money between your own accounts? Use Transfer instead.</span>
+      </div>
+      <div class="field" style="margin-bottom:14px">
+        <label for="ntx-account">Account</label>
+        <select class="input" id="ntx-account"><option>BCA &middot; Rp 4,120,000</option><option>Dana &middot; Rp 850,000</option><option>Cash &middot; Rp 320,000</option></select>
+      </div>
+      <div class="form-row" style="margin-bottom:14px">
+        <div class="field">
+          <label for="ntx-amount">Amount</label>
+          <div class="amount-field"><span class="cur">Rp</span><input class="input tnum" id="ntx-amount" inputmode="numeric" placeholder="150,000" /></div>
+        </div>
+        <div class="field">
+          <label for="ntx-cat">Category</label>
+          <select class="input" id="ntx-cat"></select>
+        </div>
+      </div>
+      <div class="form-row" style="margin-bottom:4px">
+        <div class="field"><label for="ntx-date">Date</label><input class="input" id="ntx-date" type="date" value="2026-09-16" /></div>
+        <div class="field"><label for="ntx-note">Note (optional)</label><input class="input" id="ntx-note" maxlength="2000" placeholder="e.g. lunch with team" /></div>
+      </div>
+      <p class="field-hint" style="margin-top:10px">The date can't be in the future, and the save button locks while it's in flight.</p>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-quiet" data-close-modal>Cancel</button>
+        <button type="submit" class="btn btn-primary">Save transaction</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ================= MODAL: TRANSFER ================= -->
+<div class="modal-scrim" id="modal-transfer" data-modal>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="tr-title" tabindex="-1">
+    <div class="modal-head">
+      <h2 id="tr-title">Transfer between accounts</h2>
+      <button class="icon-btn" type="button" aria-label="Close" data-close-modal>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form id="transfer-form" novalidate>
+      <div id="tr-error" class="form-alert" role="alert" style="display:none;margin-bottom:14px">The source and destination must be different accounts.</div>
+      <div class="form-row" style="margin-bottom:14px">
+        <div class="field"><label for="tr-from">From</label><select class="input" id="tr-from"><option value="bca">BCA &middot; Rp 4,120,000</option><option value="dana">Dana &middot; Rp 850,000</option><option value="cash">Cash &middot; Rp 320,000</option></select></div>
+        <div class="field"><label for="tr-to">To</label><select class="input" id="tr-to"><option value="dana">Dana &middot; Rp 850,000</option><option value="bca">BCA &middot; Rp 4,120,000</option><option value="cash">Cash &middot; Rp 320,000</option></select></div>
+      </div>
+      <div class="field" style="margin-bottom:14px">
+        <label for="tr-amount">Amount</label>
+        <div class="amount-field"><span class="cur">Rp</span><input class="input tnum" id="tr-amount" inputmode="numeric" value="500,000" /></div>
+      </div>
+      <div class="effect-box">
+        <div class="eb-label">Effect on both accounts, before you confirm</div>
+        <div class="effect-row"><span class="er-name">BCA</span><span class="er-val tnum">Rp 4,120,000 &rarr; <b>Rp 3,620,000</b></span></div>
+        <div class="effect-row"><span class="er-name">Dana</span><span class="er-val tnum">Rp 850,000 &rarr; <b>Rp 1,350,000</b></span></div>
+      </div>
+      <p class="field-hint" style="margin-top:10px">A transfer is one record with two balance effects. It never appears in income or expense reports.</p>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-quiet" data-close-modal>Cancel</button>
+        <button type="submit" class="btn btn-primary">Confirm transfer</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ================= MODAL: CORRECT OPENING BALANCE ================= -->
+<div class="modal-scrim" id="modal-opening-balance" data-modal>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="ob-title" tabindex="-1">
+    <div class="modal-head">
+      <h2 id="ob-title">Correct opening balance: BCA</h2>
+      <button class="icon-btn" type="button" aria-label="Close" data-close-modal>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form id="ob-form" novalidate>
+      <div class="field" style="margin-bottom:6px">
+        <label for="ob-amount">Opening balance</label>
+        <div class="amount-field"><span class="cur">Rp</span><input class="input tnum" id="ob-amount" inputmode="numeric" value="3,500,000" /></div>
+      </div>
+      <p class="field-hint">Current opening balance: Rp 3,500,000. This isn't income, so it never appears in your income or expense totals; it only shifts this account's balance.</p>
+      <div class="detail-section">
+        <label>Change history</label>
+        <div class="rev-row"><span class="rv-k">Rp 3,000,000 &rarr; Rp 3,500,000</span><span class="rv-t tnum">2 Sep 2026</span></div>
+        <div class="rev-row"><span class="rv-k">Set at account creation</span><span class="rv-t tnum">28 Aug 2026</span></div>
+        <p class="field-hint" style="margin-top:8px">Each correction is kept as its own immutable entry, not written over the last one.</p>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-quiet" data-close-modal>Cancel</button>
+        <button type="submit" class="btn btn-primary">Save correction</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ================= MODAL: NEW ACCOUNT ================= -->
+<div class="modal-scrim" id="modal-new-account" data-modal>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="na-title" tabindex="-1">
+    <div class="modal-head">
+      <h2 id="na-title">New account</h2>
+      <button class="icon-btn" type="button" aria-label="Close" data-close-modal>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form id="na-form" novalidate>
+      <div id="na-error" class="form-alert" role="alert" style="display:none;margin-bottom:14px">A name is required.</div>
+      <div class="field" style="margin-bottom:14px">
+        <label for="na-name">Name <span style="color:var(--danger)">*</span></label>
+        <input class="input" id="na-name" maxlength="120" placeholder="e.g. BCA" />
+      </div>
+      <div class="form-row" style="margin-bottom:4px">
+        <div class="field"><label for="na-type">Type</label><select class="input" id="na-type"><option>Cash</option><option>Bank</option><option>E-wallet</option></select></div>
+        <div class="field"><label for="na-open">Opening balance</label><div class="amount-field"><span class="cur">Rp</span><input class="input tnum" id="na-open" inputmode="numeric" value="0" /></div></div>
+      </div>
+      <p class="field-hint" style="margin-top:10px">All accounts are in IDR. Balance is then computed from the transactions you post.</p>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-quiet" data-close-modal>Cancel</button>
+        <button type="submit" class="btn btn-primary">Create account</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ================= MODAL: TRANSACTION DETAIL (POSTED, with revisions + void) ================= -->
+<div class="modal-scrim" id="modal-tx-detail" data-modal>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="txd-title" tabindex="-1">
+    <div class="modal-head">
+      <h2 id="txd-title">Transaction</h2>
+      <button class="icon-btn" type="button" aria-label="Close" data-close-modal>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="detail-amt tnum amt-out" id="txd-amt">&minus; Rp 150,000</div>
+    <div class="detail-chips" id="txd-chips">
+      <span class="chip">Expense</span>
+      <span class="chip">Posted</span>
+      <span class="chip">BCA</span>
+      <span class="chip">Food &amp; Drink</span>
+    </div>
+    <p class="detail-desc">Lunch with the team. Dated 16 Sep 2026.</p>
+
+    <div class="detail-section">
+      <label>Revision history</label>
+      <div class="rev-row"><span class="rv-k">Edited &middot; amount Rp 120,000 &rarr; Rp 150,000</span><span class="rv-t tnum">16 Sep, 20:10</span></div>
+      <div class="rev-row"><span class="rv-k">Posted</span><span class="rv-t tnum">16 Sep, 13:02</span></div>
+      <div class="rev-row"><span class="rv-k">Created</span><span class="rv-t tnum">16 Sep, 13:01</span></div>
+    </div>
+
+    <div class="detail-actions" id="txd-actions">
+      <button class="btn" type="button" data-close-modal>Correct</button>
+      <button class="btn btn-danger" type="button" id="txd-void-btn">Void</button>
+    </div>
+
+    <div class="confirm-block" id="txd-void-confirm" hidden>
+      <p><b style="color:var(--ink)">Void this transaction?</b> The record is kept for history but removed from your balance, and past reports recompute. A voided transaction can't be edited or posted again.</p>
+      <div class="confirm-actions">
+        <button class="btn btn-sm btn-quiet" type="button" id="txd-void-cancel">Keep it</button>
+        <button class="btn btn-sm btn-danger" type="button" id="txd-void-confirm-btn">Confirm void</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODAL: TRANSACTION DETAIL (DRAFT) ================= -->
+<div class="modal-scrim" id="modal-tx-draft" data-modal>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="txdr-title" tabindex="-1">
+    <div class="modal-head">
+      <h2 id="txdr-title">Transaction</h2>
+      <button class="icon-btn" type="button" aria-label="Close" data-close-modal>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="detail-amt tnum">Rp 99,000</div>
+    <div class="detail-chips">
+      <span class="chip">Expense</span>
+      <span class="chip">Draft, not in balance yet</span>
+      <span class="chip">BCA</span>
+      <span class="chip">Subscriptions</span>
+    </div>
+    <p class="detail-desc">Created by a monthly recurring rule. Confirming it posts the transaction and updates your balance; editing here doesn't change the rule.</p>
+
+    <div class="detail-section">
+      <label>Revision history</label>
+      <div class="rev-row"><span class="rv-k">Created as draft</span><span class="rv-t tnum">14 Sep, 00:05</span></div>
+    </div>
+
+    <div class="detail-actions">
+      <button class="btn btn-primary" type="button" id="txdr-confirm">Confirm &amp; post</button>
+      <button class="btn" type="button" data-close-modal>Edit</button>
+      <button class="btn btn-danger" type="button" data-close-modal>Cancel draft</button>
+    </div>
+    <p class="field-hint" id="txdr-posted" hidden style="margin-top:12px;color:var(--accent);font-weight:600">Posted. It now counts toward your balance and this month's budget.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // Theme toggle — same mechanism as ThemeToggle.tsx (data-theme on <html>).
+  var themeBtn = document.getElementById("theme-btn");
+  var sunPath = '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>';
+  var moonPath = '<path d="M12 3a6.4 6.4 0 0 0 9 9 9 9 0 1 1-9-9Z"/>';
+  themeBtn.addEventListener("click", function () {
+    var next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    themeBtn.setAttribute("aria-label", next === "dark" ? "Switch to light theme" : "Switch to dark theme");
+    themeBtn.querySelector("svg").innerHTML = next === "dark" ? sunPath : moonPath;
+  });
+
+  // Sub-nav tabs: Accounts / Transactions / Budgets (real /finance/* routes).
+  var tabs = document.querySelectorAll('[role="tab"][data-tab]');
+  tabs.forEach(function (tab) {
+    tab.addEventListener("click", function () {
+      tabs.forEach(function (t) { t.setAttribute("aria-selected", String(t === tab)); });
+      document.querySelectorAll("[data-panel]").forEach(function (p) {
+        p.hidden = p.id !== "panel-" + tab.dataset.tab;
+      });
+    });
+  });
+
+  // Modals with a focus trap (Tab cycles inside the open dialog; Escape closes).
+  var lastTrigger = null;
+  var FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  function openModal(id) {
+    var m = document.getElementById(id);
+    if (!m) return;
+    lastTrigger = document.activeElement;
+    m.classList.add("is-open");
+    document.body.style.overflow = "hidden";
+    m.querySelector(".modal-panel").focus();
+  }
+  function closeModal(m) {
+    m.classList.remove("is-open");
+    document.body.style.overflow = "";
+    if (lastTrigger && typeof lastTrigger.focus === "function") lastTrigger.focus();
+  }
+  document.querySelectorAll("[data-open-modal]").forEach(function (btn) {
+    btn.addEventListener("click", function () { openModal(btn.dataset.openModal); });
+  });
+  document.querySelectorAll("[data-modal]").forEach(function (m) {
+    m.addEventListener("mousedown", function (e) { if (e.target === m) closeModal(m); });
+    m.querySelectorAll("[data-close-modal]").forEach(function (btn) {
+      btn.addEventListener("click", function () { closeModal(m); });
+    });
+  });
+  document.addEventListener("keydown", function (e) {
+    var open = document.querySelector(".modal-scrim.is-open");
+    if (!open) return;
+    if (e.key === "Escape") { closeModal(open); return; }
+    if (e.key === "Tab") {
+      var items = Array.prototype.filter.call(open.querySelectorAll(FOCUSABLE), function (el) { return el.offsetParent !== null; });
+      if (!items.length) return;
+      var first = items[0], last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+  });
+
+  // New transaction: switch category options with type, validate the amount.
+  var CATS = { expense: ["Food & Drink", "Transport", "Utilities", "Subscriptions"], income: ["Salary", "Freelance"] };
+  var catSelect = document.getElementById("ntx-cat");
+  function fillCats(type) {
+    catSelect.innerHTML = "";
+    CATS[type].forEach(function (name) {
+      var o = document.createElement("option");
+      o.textContent = name;
+      catSelect.appendChild(o);
+    });
+  }
+  fillCats("expense");
+  document.querySelectorAll("#ntx-type [data-txtype]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      document.querySelectorAll("#ntx-type [data-txtype]").forEach(function (x) { x.setAttribute("aria-selected", String(x === b)); });
+      fillCats(b.dataset.txtype);
+    });
+  });
+  function digits(v) { return (v || "").replace(/[^0-9]/g, ""); }
+  var ntxForm = document.getElementById("new-tx-form");
+  ntxForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var amt = document.getElementById("ntx-amount");
+    var err = document.getElementById("ntx-error");
+    if (Number(digits(amt.value)) <= 0) {
+      err.style.display = "block";
+      amt.setAttribute("aria-invalid", "true");
+      amt.focus();
+      return;
+    }
+    err.style.display = "none";
+    amt.removeAttribute("aria-invalid");
+    closeModal(document.getElementById("modal-new-tx"));
+    ntxForm.reset();
+    fillCats(document.querySelector('#ntx-type [aria-selected="true"]').dataset.txtype);
+  });
+
+  // Transfer: reject same source and destination.
+  var trForm = document.getElementById("transfer-form");
+  trForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var from = document.getElementById("tr-from");
+    var to = document.getElementById("tr-to");
+    var err = document.getElementById("tr-error");
+    if (from.value === to.value) {
+      err.style.display = "block";
+      to.setAttribute("aria-invalid", "true");
+      to.focus();
+      return;
+    }
+    err.style.display = "none";
+    to.removeAttribute("aria-invalid");
+    closeModal(document.getElementById("modal-transfer"));
+  });
+
+  // New account: name required.
+  var naForm = document.getElementById("na-form");
+  naForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var name = document.getElementById("na-name");
+    var err = document.getElementById("na-error");
+    if (!name.value.trim()) {
+      err.style.display = "block";
+      name.setAttribute("aria-invalid", "true");
+      name.focus();
+      return;
+    }
+    err.style.display = "none";
+    name.removeAttribute("aria-invalid");
+    closeModal(document.getElementById("modal-new-account"));
+    naForm.reset();
+  });
+
+  // Opening balance correction: local close.
+  document.getElementById("ob-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    closeModal(document.getElementById("modal-opening-balance"));
+  });
+
+  // Void flow inside the transaction detail modal.
+  var voidBtn = document.getElementById("txd-void-btn");
+  var voidConfirm = document.getElementById("txd-void-confirm");
+  var voidCancel = document.getElementById("txd-void-cancel");
+  var voidConfirmBtn = document.getElementById("txd-void-confirm-btn");
+  voidBtn.addEventListener("click", function () {
+    voidConfirm.hidden = false;
+    voidBtn.disabled = true;
+    voidCancel.focus();
+  });
+  voidCancel.addEventListener("click", function () {
+    voidConfirm.hidden = true;
+    voidBtn.disabled = false;
+    voidBtn.focus();
+  });
+  voidConfirmBtn.addEventListener("click", function () {
+    document.getElementById("txd-chips").innerHTML =
+      '<span class="chip-danger">Void</span><span class="chip">BCA</span><span class="chip">Food &amp; Drink</span>';
+    var amt = document.getElementById("txd-amt");
+    amt.style.textDecoration = "line-through";
+    amt.style.color = "var(--muted)";
+    document.getElementById("txd-actions").innerHTML =
+      '<button class="btn" type="button" data-close-modal-inner>Close</button>';
+    voidConfirm.hidden = true;
+    document.querySelector("#txd-actions [data-close-modal-inner]").addEventListener("click", function () {
+      closeModal(document.getElementById("modal-tx-detail"));
+    });
+  });
+
+  // Draft: confirm & post (local feedback).
+  var draftConfirm = document.getElementById("txdr-confirm");
+  draftConfirm.addEventListener("click", function () {
+    document.getElementById("txdr-posted").hidden = false;
+    draftConfirm.disabled = true;
+    draftConfirm.textContent = "Posted";
+  });
+})();
+</script>
+</body>
+</html>
