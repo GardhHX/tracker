@@ -1,0 +1,173 @@
+// Tracker — M0 schema (identitas & sistem) per SCHEMA.md
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+enum AuthTokenPurpose {
+  email_verify
+  password_reset
+  password_setup
+}
+
+enum EmailOutboxStatus {
+  pending
+  sending
+  sent
+  failed
+}
+
+enum PomodoroPhase {
+  focus
+  short_break
+  long_break
+}
+
+model User {
+  id                String    @id @default(uuid()) @db.Uuid
+  email             String    @unique
+  name              String
+  email_verified_at DateTime? @map("email_verified_at") @db.Timestamptz(6)
+  password_hash     String?   @map("password_hash")
+  timezone          String    @default("Asia/Jakarta")
+  session_version   Int       @default(1) @map("session_version")
+  version           Int       @default(1)
+  created_at        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  auth_accounts    AuthAccount[]
+  auth_tokens      AuthToken[]
+  auth_link_intents AuthLinkIntent[]
+  idempotency_records IdempotencyRecord[]
+  pomodoro_days       PomodoroDay[]
+  pomodoro_state      PomodoroState? @relation("PomodoroStateUser")
+
+  @@map("user")
+}
+
+model AuthAccount {
+  id                  String   @id @default(uuid()) @db.Uuid
+  user_id             String   @map("user_id") @db.Uuid
+  provider            String
+  provider_account_id String   @map("provider_account_id")
+  created_at          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [user_id], references: [id])
+
+  @@unique([provider, provider_account_id])
+  @@map("auth_account")
+}
+
+model AuthLinkIntent {
+  id                    String    @id @default(uuid()) @db.Uuid
+  user_id               String    @map("user_id") @db.Uuid
+  intent_hash           String    @unique @map("intent_hash")
+  session_binding_hash  String    @map("session_binding_hash")
+  expires_at            DateTime  @map("expires_at") @db.Timestamptz(6)
+  used_at               DateTime? @map("used_at") @db.Timestamptz(6)
+  created_at            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [user_id], references: [id])
+
+  @@index([expires_at])
+  @@map("auth_link_intent")
+}
+
+model AuthToken {
+  id         String           @id @default(uuid()) @db.Uuid
+  user_id    String           @map("user_id") @db.Uuid
+  purpose    AuthTokenPurpose
+  token_hash String           @unique @map("token_hash")
+  expires_at DateTime         @map("expires_at") @db.Timestamptz(6)
+  used_at    DateTime?        @map("used_at") @db.Timestamptz(6)
+  created_at DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [user_id], references: [id])
+
+  @@index([expires_at])
+  @@map("auth_token")
+}
+
+model EmailOutbox {
+  id                 String            @id @default(uuid()) @db.Uuid
+  dedupe_key         String            @unique @map("dedupe_key")
+  recipient          String
+  template           String
+  payload_ciphertext String?           @map("payload_ciphertext")
+  status             EmailOutboxStatus @default(pending)
+  attempts           Int               @default(0)
+  next_attempt_at    DateTime          @default(now()) @map("next_attempt_at") @db.Timestamptz(6)
+  locked_until       DateTime?         @map("locked_until") @db.Timestamptz(6)
+  created_at         DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at         DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([status, next_attempt_at])
+  @@map("email_outbox")
+}
+
+model IdempotencyRecord {
+  id              String   @id @default(uuid()) @db.Uuid
+  user_id         String   @map("user_id") @db.Uuid
+  key             String
+  method          String
+  route           String
+  request_hash    String   @map("request_hash")
+  response_status Int      @map("response_status")
+  response_json   Json     @map("response_json")
+  expires_at      DateTime @map("expires_at") @db.Timestamptz(6)
+  created_at      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [user_id], references: [id])
+
+  @@unique([user_id, key])
+  @@map("idempotency_record")
+}
+
+model RateLimitBucket {
+  bucket_hash  String   @id @map("bucket_hash")
+  window_start DateTime @map("window_start") @db.Timestamptz(6)
+  count        Int
+  expires_at   DateTime @map("expires_at") @db.Timestamptz(6)
+
+  @@index([expires_at])
+  @@map("rate_limit_bucket")
+}
+
+model PomodoroDay {
+  id                   String        @id @default(uuid()) @db.Uuid
+  user_id              String        @map("user_id") @db.Uuid
+  cycle_date           DateTime      @map("cycle_date") @db.Date
+  timezone             String
+  next_phase           PomodoroPhase @default(focus) @map("next_phase")
+  completed_focus_count Int          @default(0) @map("completed_focus_count")
+  version              Int           @default(1)
+  created_at           DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at           DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user   User            @relation(fields: [user_id], references: [id])
+  states PomodoroState[] @relation("PomodoroStateDay")
+
+  @@unique([user_id, cycle_date])
+  @@unique([user_id, id])
+  @@map("pomodoro_day")
+}
+
+model PomodoroState {
+  user_id               String        @id @map("user_id") @db.Uuid
+  cycle_day_id          String?       @map("cycle_day_id") @db.Uuid
+  next_phase            PomodoroPhase @default(focus) @map("next_phase")
+  completed_focus_count Int           @default(0) @map("completed_focus_count")
+  version               Int           @default(1)
+  updated_at            DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User         @relation("PomodoroStateUser", fields: [user_id], references: [id])
+  day  PomodoroDay? @relation("PomodoroStateDay", fields: [user_id, cycle_day_id], references: [user_id, id])
+
+  @@map("pomodoro_state")
+}
