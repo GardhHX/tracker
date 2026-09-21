@@ -1,8 +1,9 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import AuthShell from "@/components/AuthShell";
 import { Field, PasswordField, GoogleButton, isValidEmail } from "@/components/form";
 import { IconMail, IconLock, IconUser } from "@/components/icons";
+import { registerWithPassword, TrackerApiError } from "@/lib/api";
 
 function strength(pw: string) {
   let score = 0;
@@ -14,6 +15,13 @@ function strength(pw: string) {
 }
 const LABELS = ["Too weak", "Weak", "Fair", "Strong", "Very strong"];
 const COLORS = ["#b42318", "#b06a00", "#b06a00", "#17724c", "#17724c"];
+
+function registrationErrorMessage(error: unknown) {
+  if (error instanceof TrackerApiError && error.code === "SERVICE_UNAVAILABLE") {
+    return "Tracker could not reach the registration service. Check that the API is running and try again.";
+  }
+  return "Tracker could not create the account. Check your details and try again.";
+}
 
 export default function RegisterPage() {
   const [name, setName] = useState("");
@@ -27,11 +35,18 @@ export default function RegisterPage() {
     agree?: string;
   }>({});
   const [status, setStatus] = useState<"idle" | "loading" | "sent">("idle");
+  const [serverError, setServerError] = useState<string | null>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
 
   const score = useMemo(() => strength(password), [password]);
 
-  const submit = (e: FormEvent) => {
+  useEffect(() => {
+    if (serverError) errorRef.current?.focus();
+  }, [serverError]);
+
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
+    setServerError(null);
     const next: typeof errors = {};
     if (!name.trim()) next.name = "Name is required.";
     if (!email.trim()) next.email = "Email is required.";
@@ -43,8 +58,13 @@ export default function RegisterPage() {
     if (Object.keys(next).length > 0) return;
 
     setStatus("loading");
-    // UI-only: registration and the verification email are wired up on the backend.
-    window.setTimeout(() => setStatus("sent"), 1100);
+    try {
+      await registerWithPassword({ name: name.trim(), email: email.trim(), password });
+      setStatus("sent");
+    } catch (error) {
+      setServerError(registrationErrorMessage(error));
+      setStatus("idle");
+    }
   };
 
   if (status === "sent") {
@@ -62,8 +82,8 @@ export default function RegisterPage() {
           </span>
           <h1>Check your email</h1>
           <p className="sub" style={{ marginTop: 14 }}>
-            If <b>{email}</b> is valid, we sent a verification link. Open it to activate
-            every module. (UI preview, no email is actually sent.)
+            If <b>{email}</b> can be registered, Tracker sent a verification link. Check
+            your inbox and spam folder.
           </p>
           <div style={{ marginTop: 26, display: "flex", gap: 10, flexWrap: "wrap" }}>
             <Link to="/verify-email" className="btn btn-primary">
@@ -99,6 +119,12 @@ export default function RegisterPage() {
         <GoogleButton label="Sign up with Google" />
         <div className="divider-or">or with email</div>
 
+        {serverError && (
+          <div className="form-alert error" role="alert" tabIndex={-1} ref={errorRef}>
+            <span>{serverError}</span>
+          </div>
+        )}
+
         <Field
           id="name"
           label="Name"
@@ -106,7 +132,11 @@ export default function RegisterPage() {
           placeholder="Your name"
           lead={<IconUser width={18} height={18} />}
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) => {
+            setName(e.target.value);
+            setErrors((current) => ({ ...current, name: undefined }));
+            setServerError(null);
+          }}
           error={errors.name}
           required
         />
@@ -119,7 +149,11 @@ export default function RegisterPage() {
           placeholder="name@email.com"
           lead={<IconMail width={18} height={18} />}
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            setErrors((current) => ({ ...current, email: undefined }));
+            setServerError(null);
+          }}
           error={errors.email}
           required
         />
@@ -131,7 +165,11 @@ export default function RegisterPage() {
             placeholder="At least 12 characters"
             lead={<IconLock width={18} height={18} />}
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              setErrors((current) => ({ ...current, password: undefined }));
+              setServerError(null);
+            }}
             error={errors.password}
             hint="Use 12 to 128 characters. Mix upper and lower case, numbers, and symbols."
             required
@@ -164,10 +202,13 @@ export default function RegisterPage() {
             <input
               type="checkbox"
               checked={agree}
-              onChange={(e) => setAgree(e.target.checked)}
+              onChange={(e) => {
+                setAgree(e.target.checked);
+                setErrors((current) => ({ ...current, agree: undefined }));
+              }}
             />
             <span>
-              I accept the preview{" "}
+              I accept the{" "}
               <Link to="/privacy" className="textlink">
                 privacy notice
               </Link>

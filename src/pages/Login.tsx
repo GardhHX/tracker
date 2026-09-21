@@ -1,17 +1,46 @@
-import { useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import AuthShell from "@/components/AuthShell";
 import { Field, PasswordField, GoogleButton, isValidEmail } from "@/components/form";
 import { IconMail, IconLock } from "@/components/icons";
+import { loginWithPassword, TrackerApiError } from "@/lib/api";
+
+function loginErrorMessage(error: unknown) {
+  if (!(error instanceof TrackerApiError)) return "Tracker could not sign you in. Try again.";
+  if (error.code === "UNAUTHENTICATED") return "Wrong email or password. Check both fields and try again.";
+  if (error.code === "RATE_LIMITED") {
+    return error.retryAfterSeconds
+      ? `Too many login attempts. Wait ${error.retryAfterSeconds} seconds and try again.`
+      : "Too many login attempts. Wait a few minutes and try again.";
+  }
+  if (error.code === "SERVICE_UNAVAILABLE") {
+    return "Tracker could not reach the sign-in service. Check that the API is running and try again.";
+  }
+  return "Tracker could not sign you in. Try again.";
+}
 
 export default function LoginPage() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
-  const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "loading">("idle");
+  const [serverError, setServerError] = useState<string | null>(() => {
+    const oauthError = searchParams.get("error");
+    if (oauthError === "link_required") return "This Google email already belongs to an account. Log in with your password, then link Google from settings.";
+    if (oauthError) return "Google sign-in could not be completed. Try again.";
+    return null;
+  });
+  const errorRef = useRef<HTMLDivElement>(null);
 
-  const submit = (e: FormEvent) => {
+  useEffect(() => {
+    if (serverError) errorRef.current?.focus();
+  }, [serverError]);
+
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
+    setServerError(null);
     const next: typeof errors = {};
     if (!email.trim()) next.email = "Email is required.";
     else if (!isValidEmail(email)) next.email = "That email looks invalid.";
@@ -20,8 +49,13 @@ export default function LoginPage() {
     if (Object.keys(next).length > 0) return;
 
     setStatus("loading");
-    // UI-only: submits to Auth.js Credentials once the backend is connected.
-    window.setTimeout(() => setStatus("error"), 1100);
+    try {
+      await loginWithPassword({ email: email.trim(), password });
+      navigate("/dashboard", { replace: true });
+    } catch (error) {
+      setServerError(loginErrorMessage(error));
+      setStatus("idle");
+    }
   };
 
   return (
@@ -45,12 +79,9 @@ export default function LoginPage() {
         <GoogleButton label="Continue with Google" />
         <div className="divider-or">or with email</div>
 
-        {status === "error" && (
-          <div className="form-alert error" role="alert">
-            <span>
-              Wrong email or password. Try again, your input is kept. (UI preview, not
-              connected to a server yet.)
-            </span>
+        {serverError && (
+          <div className="form-alert error" role="alert" tabIndex={-1} ref={errorRef}>
+            <span>{serverError}</span>
           </div>
         )}
 
@@ -63,7 +94,11 @@ export default function LoginPage() {
           placeholder="name@email.com"
           lead={<IconMail width={18} height={18} />}
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            setErrors((current) => ({ ...current, email: undefined }));
+            setServerError(null);
+          }}
           error={errors.email}
           required
         />
@@ -76,14 +111,15 @@ export default function LoginPage() {
             placeholder="Enter your password"
             lead={<IconLock width={18} height={18} />}
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              setErrors((current) => ({ ...current, password: undefined }));
+              setServerError(null);
+            }}
             error={errors.password}
             required
           />
-          <div className="form-row" style={{ marginTop: 12 }}>
-            <label className="check">
-              <input type="checkbox" defaultChecked /> Remember me
-            </label>
+          <div className="form-row" style={{ marginTop: 12, justifyContent: "flex-end" }}>
             <Link to="/forgot-password" className="textlink">
               Forgot password?
             </Link>
@@ -106,7 +142,7 @@ export default function LoginPage() {
       </form>
 
       <p className="auth-alt">
-        By logging in you agree to the preview{" "}
+        By logging in you agree to the{" "}
         <Link to="/privacy" className="textlink">
           privacy notice
         </Link>

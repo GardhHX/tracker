@@ -3,78 +3,30 @@ import { Link } from "react-router-dom";
 import AppShell from "@/components/AppShell";
 import Modal from "@/components/Modal";
 import { IconPlus, IconCheck } from "@/components/icons";
+import { cancelTimebox, createTimebox, deleteHabitCheckIn, getPomodoroActive, listHabitCheckIns, listHabits, listHabitSchedules, listTasks, listTimebox, patchTimebox, setHabitCheckIn, setTaskStatus, startPomodoro, TrackerApiError, type HabitDto, type PomodoroBundleDto, type TaskDto } from "@/lib/api";
 
 type Kind = "Class" | "Task" | "Habit" | "Focus";
 
 type TimeboxBlock = {
   id: string;
+  version: number;
   kind: Kind;
   title: string;
   start: string;
   end: string;
   linkedTo?: string;
+  taskId?: string;
+  habitId?: string;
 };
-
-// Sample data: illustrates the layout only, not real records.
-const SAMPLE_BLOCKS: TimeboxBlock[] = [
-  { id: "tb-1", kind: "Class", title: "Statistics Lecture", start: "07:00", end: "09:00" },
-  {
-    id: "tb-2",
-    kind: "Focus",
-    title: "Competitor research",
-    start: "09:30",
-    end: "09:55",
-    linkedTo: "Competitor research",
-  },
-  { id: "tb-3", kind: "Class", title: "Database Systems Lab", start: "13:00", end: "14:30" },
-  {
-    id: "tb-4",
-    kind: "Task",
-    title: "File tax report",
-    start: "15:00",
-    end: "15:30",
-    linkedTo: "File tax report",
-  },
-  {
-    id: "tb-5",
-    kind: "Habit",
-    title: "Read 10 pages",
-    start: "19:00",
-    end: "19:30",
-    linkedTo: "Read 10 pages",
-  },
-];
-
-const SAMPLE_TASKS = [
-  { id: "t-1", title: "File tax report", due: "Today", done: false, overdue: false },
-  { id: "t-2", title: "Pay internet bill", due: "Overdue", done: false, overdue: true },
-];
-
-const SAMPLE_HABITS: {
+type TimeboxDraft = Pick<TimeboxBlock, "kind" | "title" | "start" | "end" | "linkedTo">;
+type DashboardHabit = {
   id: string;
+  version: number;
   title: string;
   week: (boolean | null)[];
   doneToday: boolean;
   count: string;
-}[] = [
-  {
-    id: "h-1",
-    title: "Read 10 pages",
-    week: [true, true, null, true, null, false, null],
-    doneToday: true,
-    count: "3/5 this week",
-  },
-  {
-    id: "h-2",
-    title: "Morning run",
-    week: [null, true, null, false, null, true, null],
-    doneToday: false,
-    count: "2/3 this week",
-  },
-];
-
-const LINKABLE_TASKS = ["File tax report", "Prepare investor slides", "Competitor research"];
-const LINKABLE_HABITS = ["Read 10 pages", "Morning run"];
+};
 const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"];
 
 function toMinutes(t: string) {
@@ -96,10 +48,14 @@ function TimeboxForm({
   initial,
   onSave,
   onCancel,
+  tasks,
+  habits,
 }: {
   initial?: TimeboxBlock;
-  onSave: (block: Omit<TimeboxBlock, "id">) => void;
+  onSave: (block: TimeboxDraft) => void;
   onCancel: () => void;
+  tasks: TaskDto[];
+  habits: HabitDto[];
 }) {
   const [kind, setKind] = useState<Kind>(initial?.kind ?? "Class");
   const [title, setTitle] = useState(initial?.title ?? "");
@@ -123,6 +79,7 @@ function TimeboxForm({
     e.preventDefault();
     if (!title.trim()) return setError("Title is required.");
     if (!start || !end) return setError("Start and end time are required.");
+    if ((kind === "Task" || kind === "Habit") && !linkedTo) return setError(`Select a ${kind.toLowerCase()} to link.`);
     if (!isFocus && toMinutes(end) <= toMinutes(start)) {
       return setError("End time must be after start time.");
     }
@@ -130,7 +87,7 @@ function TimeboxForm({
     onSave({ kind, title: title.trim(), start, end, linkedTo: linkedTo || undefined });
   }
 
-  const linkOptions = kind === "Task" || kind === "Focus" ? LINKABLE_TASKS : kind === "Habit" ? LINKABLE_HABITS : [];
+  const linkOptions = kind === "Task" || kind === "Focus" ? tasks.map((item) => ({ id: item.id, label: item.title })) : kind === "Habit" ? habits.map((item) => ({ id: item.id, label: item.name })) : [];
 
   return (
     <form onSubmit={submit} noValidate>
@@ -170,8 +127,8 @@ function TimeboxForm({
           <select id="tb-link" className="input" value={linkedTo} onChange={(e) => setLinkedTo(e.target.value)}>
             <option value="">{isFocus ? "No task" : "Select one"}</option>
             {linkOptions.map((o) => (
-              <option key={o} value={o}>
-                {o}
+              <option key={o.id} value={o.id}>
+                {o.label}
               </option>
             ))}
           </select>
@@ -228,8 +185,12 @@ function TimeboxForm({
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [blocks, setBlocks] = useState<TimeboxBlock[]>([]);
-  const [tasks, setTasks] = useState(SAMPLE_TASKS);
-  const [habits, setHabits] = useState(SAMPLE_HABITS);
+  const [tasks, setTasks] = useState<TaskDto[]>([]);
+  const [habitResources, setHabitResources] = useState<HabitDto[]>([]);
+  const [habits, setHabits] = useState<DashboardHabit[]>([]);
+  const [pomodoro, setPomodoro] = useState<PomodoroBundleDto>();
+  const [pageError, setPageError] = useState<string>();
+  const [saving, setSaving] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -245,11 +206,31 @@ export default function DashboardPage() {
       now.toLocaleDateString("en-US", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
     );
     setNowMinutes(hour * 60 + now.getMinutes());
-    const t = window.setTimeout(() => {
-      setBlocks(SAMPLE_BLOCKS);
-      setLoading(false);
-    }, 650);
-    return () => window.clearTimeout(t);
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const monday = new Date(now); monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+    const weekStart = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, "0")}-${String(monday.getDate()).padStart(2, "0")}`;
+    let active = true;
+    Promise.all([listTimebox(today), listTasks("archived=false&page_size=100"), listHabits("false"), getPomodoroActive()]).then(async ([timebox, taskResult, habitResult, pomoResult]) => {
+      const habitDetails = await Promise.all(habitResult.data.map((habit) => Promise.all([listHabitCheckIns(habit.id, weekStart, today), listHabitSchedules(habit.id)])));
+      if (!active) return;
+      const taskMap = new Map(taskResult.data.map((task) => [task.id, task.title]));
+      const habitMap = new Map(habitResult.data.map((habit) => [habit.id, habit.name]));
+      setBlocks(timebox.data.map((entry) => ({ id: entry.id, version: entry.version, kind: `${entry.kind[0].toUpperCase()}${entry.kind.slice(1)}` as Kind, title: entry.title, start: new Date(entry.starts_at).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }), end: new Date(entry.ends_at).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }), linkedTo: entry.task_id ? taskMap.get(entry.task_id) : entry.habit_id ? habitMap.get(entry.habit_id) : undefined, taskId: entry.task_id ?? undefined, habitId: entry.habit_id ?? undefined })));
+      setTasks(taskResult.data.filter((task) => task.status !== "done").slice(0, 5));
+      setHabitResources(habitResult.data);
+      setHabits(habitResult.data.map((habit, index) => {
+        const dates = Array.from({ length: 7 }, (_, day) => { const value = new Date(monday); value.setDate(monday.getDate() + day); return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`; });
+        const checked = new Set(habitDetails[index][0].data.map((entry) => entry.date));
+        const schedules = habitDetails[index][1].data;
+        const week = dates.map((date, day) => {
+          const schedule = [...schedules].reverse().find((item) => item.effective_from <= date) ?? habit.current_schedule;
+          return schedule.weekdays.includes(day + 1) ? checked.has(date) : null;
+        });
+        return { id: habit.id, version: habit.version, title: habit.name, week, doneToday: checked.has(today), count: `${week.filter((value) => value === true).length}/${week.filter((value) => value !== null).length} this week` };
+      }));
+      setPomodoro(pomoResult.data);
+    }).catch((error) => { if (active) setPageError(error instanceof TrackerApiError ? error.message : "Dashboard data could not be loaded."); }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, []);
 
   const sortedBlocks = useMemo(
@@ -258,25 +239,59 @@ export default function DashboardPage() {
   );
   const selected = blocks.find((b) => b.id === selectedId) ?? null;
 
-  function addBlock(block: Omit<TimeboxBlock, "id">) {
-    setBlocks((prev) => [...prev, { ...block, id: `tb-${Date.now()}` }]);
+  async function addBlock(block: TimeboxDraft) {
+    setSaving(true); setPageError(undefined);
+    try {
+      const today = new Date(); const date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+      const startsAt = new Date(`${date}T${block.start}:00`).toISOString(); const endsAt = new Date(`${date}T${block.end}:00`).toISOString();
+      const kind = block.kind.toLowerCase() as "class" | "task" | "habit" | "focus";
+      const value = await createTimebox({ kind, title: block.title, starts_at: startsAt, ends_at: endsAt, task_id: kind === "task" || kind === "focus" ? block.linkedTo || null : null, habit_id: kind === "habit" ? block.linkedTo || null : null });
+      const linked = tasks.find((item) => item.id === value.task_id)?.title ?? habitResources.find((item) => item.id === value.habit_id)?.name;
+      setBlocks((prev) => [...prev, { ...block, id: value.id, version: value.version, linkedTo: linked, taskId: value.task_id ?? undefined, habitId: value.habit_id ?? undefined }]); setAdding(false);
+    } catch (error) { setPageError(error instanceof TrackerApiError ? error.message : "The timebox could not be created."); }
+    finally { setSaving(false); }
   }
 
-  function updateBlock(id: string, patch: Omit<TimeboxBlock, "id">) {
-    setBlocks((prev) => prev.map((b) => (b.id === id ? { ...patch, id } : b)));
+  async function updateBlock(id: string, patch: TimeboxDraft) {
+    const current = blocks.find((item) => item.id === id); if (!current) return;
+    setSaving(true); setPageError(undefined);
+    try {
+      const today = new Date(); const date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+      const kind = patch.kind.toLowerCase() as "class" | "task" | "habit" | "focus";
+      const value = await patchTimebox(id, { version: current.version, kind, title: patch.title, starts_at: new Date(`${date}T${patch.start}:00`).toISOString(), ends_at: new Date(`${date}T${patch.end}:00`).toISOString(), task_id: kind === "task" || kind === "focus" ? patch.linkedTo || null : null, habit_id: kind === "habit" ? patch.linkedTo || null : null });
+      const linked = tasks.find((item) => item.id === value.task_id)?.title ?? habitResources.find((item) => item.id === value.habit_id)?.name;
+      setBlocks((prev) => prev.map((item) => item.id === id ? { ...patch, id, version: value.version, linkedTo: linked, taskId: value.task_id ?? undefined, habitId: value.habit_id ?? undefined } : item)); setEditing(false); setSelectedId(null);
+    } catch (error) { setPageError(error instanceof TrackerApiError ? error.message : "The timebox could not be updated."); }
+    finally { setSaving(false); }
   }
 
-  function cancelBlock(id: string) {
-    setBlocks((prev) => prev.filter((b) => b.id !== id));
-    setSelectedId(null);
+  async function cancelBlock(id: string) {
+    const current = blocks.find((item) => item.id === id); if (!current) return;
+    setSaving(true); setPageError(undefined);
+    try { await cancelTimebox(id, current.version); setBlocks((prev) => prev.filter((item) => item.id !== id)); setSelectedId(null); }
+    catch (error) { setPageError(error instanceof TrackerApiError ? error.message : "The timebox could not be cancelled."); }
+    finally { setSaving(false); }
   }
 
-  function toggleTask(id: string) {
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
+  async function toggleTask(id: string) {
+    const current = tasks.find((item) => item.id === id); if (!current) return;
+    try { const value = await setTaskStatus(id, { version: current.version, status: current.status === "done" ? "todo" : "done" }); setTasks((prev) => prev.map((item) => item.id === id ? value : item)); }
+    catch (error) { setPageError(error instanceof TrackerApiError ? error.message : "The task could not be updated."); }
   }
 
-  function checkInHabit(id: string) {
-    setHabits((prev) => prev.map((h) => (h.id === id ? { ...h, doneToday: !h.doneToday } : h)));
+  async function checkInHabit(id: string) {
+    const current = habits.find((item) => item.id === id); if (!current) return;
+    const now = new Date(); const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    try { if (current.doneToday) await deleteHabitCheckIn(id, today); else await setHabitCheckIn(id, today); setHabits((prev) => prev.map((item) => item.id === id ? { ...item, doneToday: !item.doneToday } : item)); }
+    catch (error) { setPageError(error instanceof TrackerApiError ? error.message : "The habit check-in could not be updated."); }
+  }
+
+  async function startDashboardPomodoro() {
+    if (!pomodoro || pomodoro.session) return;
+    setSaving(true); setPageError(undefined);
+    try { const result = await startPomodoro(pomodoro.state.version); setPomodoro(result.data); }
+    catch (error) { setPageError(error instanceof TrackerApiError ? error.message : "Pomodoro could not be started."); }
+    finally { setSaving(false); }
   }
 
   return (
@@ -284,11 +299,10 @@ export default function DashboardPage() {
       <div className="page-head">
         <span className="label">{dateLabel || "Today"}</span>
         <h1>{greeting || "Hello"}</h1>
-        <p className="field-hint" style={{ marginTop: 8 }}>
-          Preview build: the Timebox, Tasks, Habits, and Pomodoro below show sample data, not a
-          real account, and are not yet connected to a server.
-        </p>
+        <p className="field-hint" style={{ marginTop: 8 }}>Timebox plans do not start or complete activities automatically.</p>
       </div>
+
+      {pageError && <div className="form-alert error" role="alert" style={{ marginBottom: 16 }}>{pageError}</div>}
 
       <div className="dash-grid">
         <section className="widget widget-timebox" aria-labelledby="tb-head">
@@ -347,23 +361,26 @@ export default function DashboardPage() {
             {tasks.length === 0 ? (
               <div className="empty-mini">No tasks yet today.</div>
             ) : (
-              tasks.map((t) => (
-                <div key={t.id} className={`list-row${t.overdue && !t.done ? " is-overdue" : ""}`}>
+              tasks.map((t) => {
+                const today = new Date().toISOString().slice(0, 10);
+                const overdue = !!t.due_date && t.due_date < today && t.status !== "done";
+                const done = t.status === "done";
+                return <div key={t.id} className={`list-row${overdue ? " is-overdue" : ""}`}>
                   <button
                     type="button"
-                    className={`chk-btn${t.done ? " is-done" : ""}`}
-                    aria-pressed={t.done}
-                    aria-label={t.done ? `Mark ${t.title} as not done` : `Mark ${t.title} as done`}
-                    onClick={() => toggleTask(t.id)}
+                    className={`chk-btn${done ? " is-done" : ""}`}
+                    aria-pressed={done}
+                    aria-label={done ? `Mark ${t.title} as not done` : `Mark ${t.title} as done`}
+                    onClick={() => void toggleTask(t.id)}
                   >
-                    {t.done && <IconCheck width={13} height={13} strokeWidth={3} />}
+                    {done && <IconCheck width={13} height={13} strokeWidth={3} />}
                   </button>
-                  <span className="list-row-title" style={t.done ? { textDecoration: "line-through", color: "var(--muted)" } : undefined}>
+                  <span className="list-row-title" style={done ? { textDecoration: "line-through", color: "var(--muted)" } : undefined}>
                     {t.title}
                   </span>
-                  <span className="list-row-meta">{t.overdue && !t.done ? "Overdue" : t.due}</span>
+                  <span className="list-row-meta">{overdue ? "Overdue" : t.due_date ?? "No due date"}</span>
                 </div>
-              ))
+              })
             )}
           </section>
 
@@ -393,7 +410,7 @@ export default function DashboardPage() {
                     );
                   })}
                 </div>
-                <button type="button" className="btn btn-sm" onClick={() => checkInHabit(h.id)}>
+                <button type="button" className="btn btn-sm" onClick={() => void checkInHabit(h.id)}>
                   {h.doneToday ? "Undo check-in" : "Check in today"}
                 </button>
               </div>
@@ -409,12 +426,10 @@ export default function DashboardPage() {
             </div>
             <div className="pomo-mini">
               <div className="pm-status">
-                <span className="pm-phase">Next phase: Focus</span>
-                <span className="pm-state">Not started</span>
+                <span className="pm-phase">{pomodoro?.session ? `Active: ${pomodoro.session.phase.replace("_", " ")}` : `Next phase: ${pomodoro?.state.next_phase.replace("_", " ") ?? "Focus"}`}</span>
+                <span className="pm-state">{pomodoro?.session?.status ?? "Not started"}</span>
               </div>
-              <Link to="/pomodoro" className="btn btn-primary btn-sm">
-                Start Focus
-              </Link>
+              {pomodoro?.session ? <Link to="/pomodoro" className="btn btn-primary btn-sm">Open timer</Link> : <button type="button" className="btn btn-primary btn-sm" disabled={!pomodoro || saving} onClick={() => void startDashboardPomodoro()}>Start {pomodoro?.state.next_phase.replace("_", " ") ?? "focus"}</button>}
             </div>
           </section>
         </div>
@@ -424,10 +439,9 @@ export default function DashboardPage() {
         <Modal title="Add timebox" onClose={() => setAdding(false)}>
           <TimeboxForm
             onCancel={() => setAdding(false)}
-            onSave={(block) => {
-              addBlock(block);
-              setAdding(false);
-            }}
+            onSave={(block) => void addBlock(block)}
+            tasks={tasks}
+            habits={habitResources}
           />
         </Modal>
       )}
@@ -450,7 +464,7 @@ export default function DashboardPage() {
             <button type="button" className="btn btn-quiet" onClick={() => setEditing(true)}>
               Edit
             </button>
-            <button type="button" className="btn" onClick={() => cancelBlock(selected.id)}>
+            <button type="button" className="btn" disabled={saving} onClick={() => void cancelBlock(selected.id)}>
               Cancel timebox
             </button>
           </div>
@@ -460,13 +474,11 @@ export default function DashboardPage() {
       {selected && editing && (
         <Modal title="Edit timebox" onClose={() => setEditing(false)}>
           <TimeboxForm
-            initial={selected}
+            initial={{ ...selected, linkedTo: selected.taskId ?? selected.habitId }}
             onCancel={() => setEditing(false)}
-            onSave={(block) => {
-              updateBlock(selected.id, block);
-              setEditing(false);
-              setSelectedId(null);
-            }}
+            onSave={(block) => void updateBlock(selected.id, block)}
+            tasks={tasks}
+            habits={habitResources}
           />
         </Modal>
       )}

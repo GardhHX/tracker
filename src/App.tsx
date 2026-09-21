@@ -7,6 +7,9 @@ import VerifyEmail from "./pages/VerifyEmail";
 import Privacy from "./pages/Privacy";
 import FinanceAccounts from "./pages/FinanceAccounts";
 import Settings from "./pages/Settings";
+import Dashboard from "./pages/Dashboard";
+import Tasks from "./pages/Tasks";
+import Projects from "./pages/Projects";
 
 export default function App() {
   return (
@@ -19,6 +22,9 @@ export default function App() {
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/finance/accounts" element={<FinanceAccounts />} />
       <Route path="/settings" element={<Settings />} />
+      <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="/tasks" element={<Tasks />} />
+      <Route path="/projects" element={<Projects />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

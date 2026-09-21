@@ -1,7 +1,13 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import AppShell from "@/components/AppShell";
 import Modal from "@/components/Modal";
 import { IconPlus, IconWallet } from "@/components/icons";
+import {
+  TrackerApiError, archiveFinanceAccount, archiveFinanceCategory, createFinanceAccount, createFinanceBudget, createFinanceCategory,
+  createFinanceTransaction, deleteFinanceBudget, listFinanceAccounts, listFinanceBalanceChanges, listFinanceBudgets, listFinanceCategories,
+  listFinanceRevisions, listFinanceTransactions, patchFinanceAccount, patchFinanceBudget, patchFinanceTransaction, postFinanceTransaction, voidFinanceTransaction,
+  type FinanceRevisionDto,
+} from "@/lib/api";
 
 type AcctType = "cash" | "bank" | "ewallet";
 type TxType = "income" | "expense" | "transfer";
@@ -9,30 +15,33 @@ type TxStatus = "draft" | "posted" | "void";
 type CatType = "income" | "expense";
 type FinTab = "accounts" | "transactions" | "budgets";
 
-type OpeningChange = { from: number | null; to: number; date: string };
-type Account = { id: string; name: string; type: AcctType; opening: number; archived: boolean; openingHistory: OpeningChange[] };
-type Category = { id: string; name: string; type: CatType; archived: boolean };
-type Revision = { action: "created" | "edited" | "posted" | "voided"; note?: string; at: string };
+type OpeningChange = { from: bigint | null; to: bigint; date: string };
+type Account = { id: string; version: number; name: string; type: AcctType; opening: bigint; balance: bigint; archived: boolean; openingHistory: OpeningChange[] };
+type Category = { id: string; version: number; name: string; type: CatType; archived: boolean };
+type Revision = { action: "created" | "edited" | "posted" | "voided"; at: string };
 type Transaction = {
   id: string;
+  version: number;
   type: TxType;
   status: TxStatus;
   accountId: string;
   toAccountId?: string;
   categoryId?: string;
-  amount: number;
+  amount: bigint;
   date: string; // YYYY-MM-DD
   note?: string;
   fromRecurring?: boolean;
   revisions: Revision[];
 };
-type Budget = { id: string; categoryId: string; limit: number };
+type Budget = { id: string; version: number; categoryId: string; limit: bigint; spent: bigint; remaining: bigint };
 
-const MONTH = "2026-09"; // the sample "current" month
+const TODAY = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+const MONTH = TODAY.slice(0, 7);
+const MONTH_START = `${MONTH}-01`;
 const ACCT_TYPE_LABEL: Record<AcctType, string> = { cash: "Cash", bank: "Bank", ewallet: "E-wallet" };
 
-function rp(n: number) {
-  return `Rp ${Math.round(n).toLocaleString("en-US")}`;
+function rp(n: bigint) {
+  return `Rp ${n.toLocaleString("en-US")}`;
 }
 function digits(v: string) {
   return v.replace(/[^0-9]/g, "");
@@ -44,48 +53,6 @@ function fmtRevTime(iso: string) {
   return new Date(iso).toLocaleString("en-US", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false });
 }
 
-const SEED_ACCOUNTS: Account[] = [
-  { id: "a-bca", name: "BCA", type: "bank", opening: 3500000, archived: false, openingHistory: [{ from: 3000000, to: 3500000, date: "2026-09-02" }, { from: null, to: 3000000, date: "2026-08-28" }] },
-  { id: "a-dana", name: "Dana", type: "ewallet", opening: 1000000, archived: false, openingHistory: [{ from: null, to: 1000000, date: "2026-08-28" }] },
-  { id: "a-cash", name: "Cash", type: "cash", opening: 500000, archived: false, openingHistory: [{ from: null, to: 500000, date: "2026-08-28" }] },
-  { id: "a-jenius", name: "Jenius", type: "bank", opening: 0, archived: true, openingHistory: [{ from: null, to: 0, date: "2026-07-10" }] },
-];
-
-const SEED_CATEGORIES: Category[] = [
-  { id: "c-salary", name: "Salary", type: "income", archived: false },
-  { id: "c-freelance", name: "Freelance", type: "income", archived: false },
-  { id: "c-bonus", name: "Bonus", type: "income", archived: true },
-  { id: "c-food", name: "Food & Drink", type: "expense", archived: false },
-  { id: "c-transport", name: "Transport", type: "expense", archived: false },
-  { id: "c-utilities", name: "Utilities", type: "expense", archived: false },
-  { id: "c-subs", name: "Subscriptions", type: "expense", archived: false },
-];
-
-function rev(action: Revision["action"], date: string, note?: string): Revision {
-  return { action, at: `${date}T09:00:00`, note };
-}
-
-const SEED_TRANSACTIONS: Transaction[] = [
-  { id: "x1", type: "income", status: "posted", accountId: "a-bca", categoryId: "c-salary", amount: 8000000, date: "2026-09-16", note: "September salary", revisions: [rev("created", "2026-09-16"), rev("posted", "2026-09-16")] },
-  { id: "x2", type: "expense", status: "posted", accountId: "a-bca", categoryId: "c-food", amount: 150000, date: "2026-09-16", note: "Lunch with the team", revisions: [rev("created", "2026-09-16"), rev("posted", "2026-09-16"), rev("edited", "2026-09-16", "amount Rp 120,000 to Rp 150,000")] },
-  { id: "x3", type: "transfer", status: "posted", accountId: "a-bca", toAccountId: "a-dana", amount: 500000, date: "2026-09-15", revisions: [rev("created", "2026-09-15"), rev("posted", "2026-09-15")] },
-  { id: "x4", type: "expense", status: "posted", accountId: "a-dana", categoryId: "c-transport", amount: 45000, date: "2026-09-15", revisions: [rev("created", "2026-09-15"), rev("posted", "2026-09-15")] },
-  { id: "x5", type: "expense", status: "draft", accountId: "a-bca", categoryId: "c-subs", amount: 99000, date: "2026-09-14", fromRecurring: true, note: "Streaming plan", revisions: [rev("created", "2026-09-14")] },
-  { id: "x6", type: "expense", status: "void", accountId: "a-bca", categoryId: "c-utilities", amount: 320000, date: "2026-09-14", note: "Double-charged, voided", revisions: [rev("created", "2026-09-14"), rev("posted", "2026-09-14"), rev("voided", "2026-09-14")] },
-  { id: "x7", type: "expense", status: "posted", accountId: "a-dana", categoryId: "c-food", amount: 640000, date: "2026-09-08", note: "Groceries", revisions: [rev("created", "2026-09-08"), rev("posted", "2026-09-08")] },
-  { id: "x8", type: "expense", status: "posted", accountId: "a-bca", categoryId: "c-food", amount: 450000, date: "2026-09-10", revisions: [rev("created", "2026-09-10"), rev("posted", "2026-09-10")] },
-  { id: "x9", type: "expense", status: "posted", accountId: "a-cash", categoryId: "c-transport", amount: 435000, date: "2026-09-05", revisions: [rev("created", "2026-09-05"), rev("posted", "2026-09-05")] },
-  { id: "x10", type: "expense", status: "posted", accountId: "a-bca", categoryId: "c-utilities", amount: 320000, date: "2026-09-03", note: "Electricity", revisions: [rev("created", "2026-09-03"), rev("posted", "2026-09-03")] },
-  { id: "x11", type: "expense", status: "posted", accountId: "a-bca", categoryId: "c-subs", amount: 110000, date: "2026-09-02", revisions: [rev("created", "2026-09-02"), rev("posted", "2026-09-02")] },
-  { id: "x12", type: "expense", status: "posted", accountId: "a-bca", categoryId: "c-subs", amount: 100000, date: "2026-09-12", revisions: [rev("created", "2026-09-12"), rev("posted", "2026-09-12")] },
-];
-
-const SEED_BUDGETS: Budget[] = [
-  { id: "b-food", categoryId: "c-food", limit: 1500000 },
-  { id: "b-transport", categoryId: "c-transport", limit: 600000 },
-  { id: "b-subs", categoryId: "c-subs", limit: 150000 },
-  { id: "b-utilities", categoryId: "c-utilities", limit: 700000 },
-];
 
 function AcctIcon({ type }: { type: AcctType }) {
   if (type === "ewallet")
@@ -145,7 +112,7 @@ function AmountInput({ id, value, onChange, autoFocus }: { id: string; value: st
   );
 }
 
-function AccountForm({ onCancel, onSave }: { onCancel: () => void; onSave: (input: { name: string; type: AcctType; opening: number }) => void }) {
+function AccountForm({ onCancel, onSave }: { onCancel: () => void; onSave: (input: { name: string; type: AcctType; opening: string }) => void }) {
   const [name, setName] = useState("");
   const [type, setType] = useState<AcctType>("bank");
   const [opening, setOpening] = useState("0");
@@ -157,7 +124,7 @@ function AccountForm({ onCancel, onSave }: { onCancel: () => void; onSave: (inpu
       setError("A name is required.");
       return;
     }
-    onSave({ name: name.trim(), type, opening: Number(digits(opening)) || 0 });
+    onSave({ name: name.trim(), type, opening: digits(opening) || "0" });
   }
 
   return (
@@ -202,11 +169,11 @@ function AccountForm({ onCancel, onSave }: { onCancel: () => void; onSave: (inpu
   );
 }
 
-function OpeningBalanceForm({ account, onCancel, onSave }: { account: Account; onCancel: () => void; onSave: (newOpening: number) => void }) {
+function OpeningBalanceForm({ account, onCancel, onSave }: { account: Account; onCancel: () => void; onSave: (newOpening: string) => void }) {
   const [amount, setAmount] = useState(String(account.opening));
   function submit(e: FormEvent) {
     e.preventDefault();
-    onSave(Number(digits(amount)) || 0);
+    onSave(digits(amount) || "0");
   }
   return (
     <form onSubmit={submit} noValidate>
@@ -241,15 +208,15 @@ function OpeningBalanceForm({ account, onCancel, onSave }: { account: Account; o
   );
 }
 
-function TransactionForm({ accounts, categories, onCancel, onSave }: { accounts: Account[]; categories: Category[]; onCancel: () => void; onSave: (input: { type: "income" | "expense"; accountId: string; categoryId: string; amount: number; date: string; note?: string }) => void }) {
+function TransactionForm({ accounts, categories, initial, onCancel, onSave }: { accounts: Account[]; categories: Category[]; initial?: Transaction; onCancel: () => void; onSave: (input: { type: "income" | "expense"; accountId: string; categoryId: string; amount: string; date: string; note?: string }) => void }) {
   const active = accounts.filter((a) => !a.archived);
-  const [type, setType] = useState<"income" | "expense">("expense");
-  const [accountId, setAccountId] = useState(active[0]?.id ?? "");
-  const [amount, setAmount] = useState("");
+  const [type, setType] = useState<"income" | "expense">(initial?.type === "income" ? "income" : "expense");
+  const [accountId, setAccountId] = useState(initial?.accountId ?? active[0]?.id ?? "");
+  const [amount, setAmount] = useState(initial?.amount.toString() ?? "");
   const cats = categories.filter((c) => c.type === type && !c.archived);
-  const [categoryId, setCategoryId] = useState(cats[0]?.id ?? "");
-  const [date, setDate] = useState("2026-09-16");
-  const [note, setNote] = useState("");
+  const [categoryId, setCategoryId] = useState(initial?.categoryId ?? cats[0]?.id ?? "");
+  const [date, setDate] = useState(initial?.date ?? TODAY);
+  const [note, setNote] = useState(initial?.note ?? "");
   const [error, setError] = useState<string | undefined>();
 
   function changeType(next: "income" | "expense") {
@@ -260,11 +227,11 @@ function TransactionForm({ accounts, categories, onCancel, onSave }: { accounts:
 
   function submit(e: FormEvent) {
     e.preventDefault();
-    if (Number(digits(amount)) <= 0) {
+    if (!digits(amount) || BigInt(digits(amount)) <= 0n) {
       setError("Enter an amount greater than zero.");
       return;
     }
-    onSave({ type, accountId, categoryId, amount: Number(digits(amount)), date, note: note.trim() || undefined });
+    onSave({ type, accountId, categoryId, amount: digits(amount), date, note: note.trim() || undefined });
   }
 
   return (
@@ -315,7 +282,7 @@ function TransactionForm({ accounts, categories, onCancel, onSave }: { accounts:
       <div style={{ display: "flex", gap: 12, marginBottom: 4 }}>
         <div className="field" style={{ flex: 1, minWidth: 0 }}>
           <label htmlFor="ntx-date">Date</label>
-          <input id="ntx-date" type="date" className="input" value={date} max="2026-09-16" onChange={(e) => setDate(e.target.value)} />
+          <input id="ntx-date" type="date" className="input" value={date} max={TODAY} onChange={(e) => setDate(e.target.value)} />
         </div>
         <div className="field" style={{ flex: 1, minWidth: 0 }}>
           <label htmlFor="ntx-note">Note (optional)</label>
@@ -337,14 +304,14 @@ function TransactionForm({ accounts, categories, onCancel, onSave }: { accounts:
   );
 }
 
-function TransferForm({ accounts, balanceOf, onCancel, onSave }: { accounts: Account[]; balanceOf: (id: string) => number; onCancel: () => void; onSave: (input: { fromId: string; toId: string; amount: number }) => void }) {
+function TransferForm({ accounts, balanceOf, initial, onCancel, onSave }: { accounts: Account[]; balanceOf: (id: string) => bigint; initial?: Transaction; onCancel: () => void; onSave: (input: { fromId: string; toId: string; amount: string }) => void }) {
   const active = accounts.filter((a) => !a.archived);
-  const [fromId, setFromId] = useState(active[0]?.id ?? "");
-  const [toId, setToId] = useState(active[1]?.id ?? active[0]?.id ?? "");
-  const [amount, setAmount] = useState("500000");
+  const [fromId, setFromId] = useState(initial?.accountId ?? active[0]?.id ?? "");
+  const [toId, setToId] = useState(initial?.toAccountId ?? active[1]?.id ?? active[0]?.id ?? "");
+  const [amount, setAmount] = useState(initial?.amount.toString() ?? "500000");
   const [error, setError] = useState<string | undefined>();
 
-  const amt = Number(digits(amount)) || 0;
+  const amt = BigInt(digits(amount) || "0");
   const from = accounts.find((a) => a.id === fromId);
   const to = accounts.find((a) => a.id === toId);
   const same = fromId === toId;
@@ -355,11 +322,11 @@ function TransferForm({ accounts, balanceOf, onCancel, onSave }: { accounts: Acc
       setError("The source and destination must be different accounts.");
       return;
     }
-    if (amt <= 0) {
+    if (amt <= 0n) {
       setError("Enter an amount greater than zero.");
       return;
     }
-    onSave({ fromId, toId, amount: amt });
+    onSave({ fromId, toId, amount: amt.toString() });
   }
 
   return (
@@ -427,17 +394,17 @@ function TransferForm({ accounts, balanceOf, onCancel, onSave }: { accounts: Acc
   );
 }
 
-function BudgetForm({ options, onCancel, onSave }: { options: Category[]; onCancel: () => void; onSave: (input: { categoryId: string; limit: number }) => void }) {
+function BudgetForm({ options, onCancel, onSave }: { options: Category[]; onCancel: () => void; onSave: (input: { categoryId: string; limit: string }) => void }) {
   const [categoryId, setCategoryId] = useState(options[0]?.id ?? "");
   const [limit, setLimit] = useState("");
   const [error, setError] = useState<string | undefined>();
   function submit(e: FormEvent) {
     e.preventDefault();
-    if (Number(digits(limit)) <= 0) {
+    if (!digits(limit) || BigInt(digits(limit)) <= 0n) {
       setError("Enter a limit greater than zero.");
       return;
     }
-    onSave({ categoryId, limit: Number(digits(limit)) });
+    onSave({ categoryId, limit: digits(limit) });
   }
   return (
     <form onSubmit={submit} noValidate>
@@ -475,22 +442,106 @@ function BudgetForm({ options, onCancel, onSave }: { options: Category[]; onCanc
   );
 }
 
+function BudgetLimitForm({ budget, category, onCancel, onSave }: { budget: Budget; category?: Category; onCancel: () => void; onSave: (limit: string) => void }) {
+  const [limit, setLimit] = useState(budget.limit.toString());
+  const [error, setError] = useState<string>();
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    const value = digits(limit);
+    if (!value || BigInt(value) <= 0n) return setError("Enter a limit greater than zero.");
+    onSave(value);
+  }
+  return <form onSubmit={submit} noValidate>
+    {error && <div className="form-alert error" role="alert">{error}</div>}
+    <p className="field-hint">{category?.name ?? "Expense category"}, {new Date(`${MONTH_START}T00:00:00`).toLocaleDateString("en-US", { month: "long", year: "numeric" })}</p>
+    <div className="field"><label htmlFor="edit-budget-limit">Monthly limit</label><AmountInput id="edit-budget-limit" value={limit} onChange={setLimit} /></div>
+    <div className="modal-foot"><button type="button" className="btn btn-quiet" onClick={onCancel}>Cancel</button><button type="submit" className="btn btn-primary">Save limit</button></div>
+  </form>;
+}
+
+function CategoryForm({ onCancel, onSave }: { onCancel: () => void; onSave: (input: { name: string; type: CatType }) => void }) {
+  const [name, setName] = useState("");
+  const [type, setType] = useState<CatType>("expense");
+  const [error, setError] = useState<string>();
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!name.trim()) return setError("A name is required.");
+    onSave({ name: name.trim(), type });
+  }
+  return (
+    <form onSubmit={submit} noValidate>
+      {error && <div className="form-alert error" role="alert">{error}</div>}
+      <div className="field" style={{ marginBottom: 14 }}>
+        <label htmlFor="category-name">Name</label>
+        <input id="category-name" className="input" value={name} maxLength={100} onChange={(event) => setName(event.target.value)} />
+      </div>
+      <div className="field">
+        <label htmlFor="category-type">Type</label>
+        <select id="category-type" className="input" value={type} onChange={(event) => setType(event.target.value as CatType)}>
+          <option value="expense">Expense</option><option value="income">Income</option>
+        </select>
+      </div>
+      <div className="modal-foot">
+        <button type="button" className="btn btn-quiet" onClick={onCancel}>Cancel</button>
+        <button type="submit" className="btn btn-primary">Create category</button>
+      </div>
+    </form>
+  );
+}
+
 export default function FinancePage() {
   const [tab, setTab] = useState<FinTab>("accounts");
-  const [accounts, setAccounts] = useState<Account[]>(SEED_ACCOUNTS);
-  const [categories, setCategories] = useState<Category[]>(SEED_CATEGORIES);
-  const [transactions, setTransactions] = useState<Transaction[]>(SEED_TRANSACTIONS);
-  const [budgets, setBudgets] = useState<Budget[]>(SEED_BUDGETS);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string>();
 
   const [addingAccount, setAddingAccount] = useState(false);
+  const [addingCategory, setAddingCategory] = useState(false);
   const [correctingId, setCorrectingId] = useState<string | null>(null);
   const [addingTx, setAddingTx] = useState(false);
   const [transferring, setTransferring] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [addingBudget, setAddingBudget] = useState(false);
+  const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
   const [voidConfirm, setVoidConfirm] = useState(false);
   const [accountFilter, setAccountFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState<"all" | TxType>("all");
+
+  function messageOf(error: unknown) {
+    return error instanceof TrackerApiError ? error.message : "Finance could not complete the request.";
+  }
+
+  async function refresh() {
+    const [accountPage, categoryPage, transactionPage, budgetPage] = await Promise.all([
+      listFinanceAccounts(), listFinanceCategories(), listFinanceTransactions(MONTH_START, TODAY), listFinanceBudgets(MONTH_START),
+    ]);
+    const mappedAccounts = await Promise.all(accountPage.data.map(async (account) => {
+      const history = await listFinanceBalanceChanges(account.id);
+      return {
+        id: account.id, version: account.version, name: account.name, type: account.type, opening: BigInt(account.opening_balance), balance: BigInt(account.balance), archived: account.archived_at !== null,
+        openingHistory: history.data.map((change) => ({ from: change.previous_balance === null ? null : BigInt(change.previous_balance), to: BigInt(change.new_balance), date: change.changed_at.slice(0, 10) })),
+      } satisfies Account;
+    }));
+    setAccounts(mappedAccounts);
+    setCategories(categoryPage.data.map((category) => ({ id: category.id, version: category.version, name: category.name, type: category.type, archived: category.archived_at !== null })));
+    setTransactions(transactionPage.data.map((transaction) => ({
+      id: transaction.id, version: transaction.version, type: transaction.type, status: transaction.status, accountId: transaction.account_id,
+      toAccountId: transaction.to_account_id ?? undefined, categoryId: transaction.category_id ?? undefined, amount: BigInt(transaction.amount),
+      date: transaction.date, note: transaction.note ?? undefined, revisions: [],
+    })));
+    setBudgets(budgetPage.data.map((budget) => ({ id: budget.id, version: budget.version, categoryId: budget.category_id, limit: BigInt(budget.limit_amount), spent: BigInt(budget.spent), remaining: BigInt(budget.remaining) })));
+  }
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    refresh().catch((error) => active && setErrorMessage(messageOf(error))).finally(() => active && setLoading(false));
+    return () => { active = false; };
+  }, []);
 
   function accountById(id?: string) {
     return accounts.find((a) => a.id === id);
@@ -500,27 +551,16 @@ export default function FinancePage() {
   }
 
   function balanceOf(accId: string) {
-    const acc = accountById(accId);
-    let bal = acc?.opening ?? 0;
-    for (const t of transactions) {
-      if (t.status !== "posted") continue;
-      if (t.type === "income" && t.accountId === accId) bal += t.amount;
-      else if (t.type === "expense" && t.accountId === accId) bal -= t.amount;
-      else if (t.type === "transfer") {
-        if (t.accountId === accId) bal -= t.amount;
-        if (t.toAccountId === accId) bal += t.amount;
-      }
-    }
-    return bal;
+    return accountById(accId)?.balance ?? 0n;
   }
 
   const activeAccounts = accounts.filter((a) => !a.archived);
-  const totalActive = activeAccounts.reduce((sum, a) => sum + balanceOf(a.id), 0);
-  const monthIn = transactions.filter((t) => t.status === "posted" && t.type === "income" && t.date.startsWith(MONTH)).reduce((s, t) => s + t.amount, 0);
-  const monthOut = transactions.filter((t) => t.status === "posted" && t.type === "expense" && t.date.startsWith(MONTH)).reduce((s, t) => s + t.amount, 0);
+  const totalActive = activeAccounts.reduce((sum, a) => sum + balanceOf(a.id), 0n);
+  const monthIn = transactions.filter((t) => t.status === "posted" && t.type === "income" && t.date.startsWith(MONTH)).reduce((s, t) => s + t.amount, 0n);
+  const monthOut = transactions.filter((t) => t.status === "posted" && t.type === "expense" && t.date.startsWith(MONTH)).reduce((s, t) => s + t.amount, 0n);
 
   function budgetActual(categoryId: string) {
-    return transactions.filter((t) => t.status === "posted" && t.type === "expense" && t.categoryId === categoryId && t.date.startsWith(MONTH)).reduce((s, t) => s + t.amount, 0);
+    return budgets.find((budget) => budget.categoryId === categoryId)?.spent ?? 0n;
   }
 
   const filteredTx = useMemo(() => {
@@ -542,65 +582,89 @@ export default function FinancePage() {
 
   const detailTx = transactions.find((t) => t.id === detailId) ?? null;
 
-  // ---- mutations ----
-  function addAccount(input: { name: string; type: AcctType; opening: number }) {
-    setAccounts((prev) => [...prev, { id: `a-${Date.now()}`, name: input.name, type: input.type, opening: input.opening, archived: false, openingHistory: [{ from: null, to: input.opening, date: "2026-09-16" }] }]);
-    setAddingAccount(false);
-  }
-  function correctOpening(accId: string, newOpening: number) {
-    setAccounts((prev) => prev.map((a) => (a.id === accId ? { ...a, opening: newOpening, openingHistory: [{ from: a.opening, to: newOpening, date: "2026-09-16" }, ...a.openingHistory] } : a)));
-    setCorrectingId(null);
-  }
-  function toggleAccountArchived(accId: string) {
-    setAccounts((prev) => prev.map((a) => (a.id === accId ? { ...a, archived: !a.archived } : a)));
-  }
-  function toggleCategoryArchived(catId: string) {
-    setCategories((prev) => prev.map((c) => (c.id === catId ? { ...c, archived: !c.archived } : c)));
-  }
-  function addTransaction(input: { type: "income" | "expense"; accountId: string; categoryId: string; amount: number; date: string; note?: string }) {
-    setTransactions((prev) => [
-      ...prev,
-      { id: `x-${Date.now()}`, type: input.type, status: "posted", accountId: input.accountId, categoryId: input.categoryId, amount: input.amount, date: input.date, note: input.note, revisions: [rev("created", input.date), rev("posted", input.date)] },
-    ]);
-    setAddingTx(false);
-  }
-  function addTransfer(input: { fromId: string; toId: string; amount: number }) {
-    setTransactions((prev) => [
-      ...prev,
-      { id: `x-${Date.now()}`, type: "transfer", status: "posted", accountId: input.fromId, toAccountId: input.toId, amount: input.amount, date: "2026-09-16", revisions: [rev("created", "2026-09-16"), rev("posted", "2026-09-16")] },
-    ]);
-    setTransferring(false);
-  }
-  function voidTransaction(id: string) {
-    setTransactions((prev) => prev.map((t) => (t.id === id ? { ...t, status: "void", revisions: [...t.revisions, rev("voided", "2026-09-16")] } : t)));
-    setVoidConfirm(false);
-  }
-  function confirmDraft(id: string) {
-    setTransactions((prev) => prev.map((t) => (t.id === id ? { ...t, status: "posted", revisions: [...t.revisions, rev("posted", "2026-09-16")] } : t)));
-  }
-  function cancelDraft(id: string) {
-    setTransactions((prev) => prev.filter((t) => t.id !== id));
-    setDetailId(null);
-  }
-  function addBudget(input: { categoryId: string; limit: number }) {
-    setBudgets((prev) => [...prev, { id: `b-${Date.now()}`, categoryId: input.categoryId, limit: input.limit }]);
-    setAddingBudget(false);
+  async function complete(action: () => Promise<void>) {
+    setErrorMessage(undefined);
+    try { await action(); await refresh(); } catch (error) { setErrorMessage(messageOf(error)); }
   }
 
-  function openDetail(id: string) {
+  async function addAccount(input: { name: string; type: AcctType; opening: string }) {
+    await complete(async () => { await createFinanceAccount({ name: input.name, type: input.type, opening_balance: input.opening }); setAddingAccount(false); });
+  }
+  async function correctOpening(accId: string, newOpening: string) {
+    const account = accountById(accId); if (!account) return;
+    await complete(async () => { await patchFinanceAccount(accId, { version: account.version, opening_balance: newOpening }); setCorrectingId(null); });
+  }
+  async function toggleAccountArchived(accId: string) {
+    const account = accountById(accId); if (!account || account.archived) return;
+    await complete(async () => { await archiveFinanceAccount(accId, account.version); });
+  }
+  async function toggleCategoryArchived(catId: string) {
+    const category = categoryById(catId); if (!category || category.archived) return;
+    await complete(async () => { await archiveFinanceCategory(catId, category.version); });
+  }
+  async function addCategory(input: { name: string; type: CatType }) {
+    await complete(async () => { await createFinanceCategory(input); setAddingCategory(false); });
+  }
+  async function addTransaction(input: { type: "income" | "expense"; accountId: string; categoryId: string; amount: string; date: string; note?: string }) {
+    await complete(async () => { await createFinanceTransaction({ type: input.type, status: "posted", account_id: input.accountId, category_id: input.categoryId, amount: input.amount, date: input.date, note: input.note }); setAddingTx(false); });
+  }
+  async function addTransfer(input: { fromId: string; toId: string; amount: string }) {
+    await complete(async () => { await createFinanceTransaction({ type: "transfer", status: "posted", account_id: input.fromId, to_account_id: input.toId, category_id: null, amount: input.amount, date: TODAY }); setTransferring(false); });
+  }
+  async function correctTransaction(input: { type: "income" | "expense"; accountId: string; categoryId: string; amount: string; date: string; note?: string }) {
+    const transaction = transactions.find((item) => item.id === editingId); if (!transaction) return;
+    await complete(async () => {
+      await patchFinanceTransaction(transaction.id, { version: transaction.version, type: input.type, account_id: input.accountId, to_account_id: null, category_id: input.categoryId, amount: input.amount, date: input.date, note: input.note ?? null });
+      setEditingId(null); setDetailId(null);
+    });
+  }
+  async function correctTransfer(input: { fromId: string; toId: string; amount: string }) {
+    const transaction = transactions.find((item) => item.id === editingId && item.type === "transfer"); if (!transaction) return;
+    await complete(async () => {
+      await patchFinanceTransaction(transaction.id, { version: transaction.version, type: "transfer", account_id: input.fromId, to_account_id: input.toId, category_id: null, amount: input.amount, date: transaction.date, note: transaction.note ?? null });
+      setEditingId(null); setDetailId(null);
+    });
+  }
+  async function voidTransaction(id: string) {
+    const transaction = transactions.find((item) => item.id === id); if (!transaction) return;
+    await complete(async () => { await voidFinanceTransaction(id, transaction.version); setVoidConfirm(false); setDetailId(null); });
+  }
+  async function confirmDraft(id: string) {
+    const transaction = transactions.find((item) => item.id === id); if (!transaction) return;
+    await complete(async () => { await postFinanceTransaction(id, transaction.version); });
+  }
+  async function cancelDraft(id: string) { await voidTransaction(id); }
+  async function addBudget(input: { categoryId: string; limit: string }) {
+    await complete(async () => { await createFinanceBudget({ category_id: input.categoryId, month: MONTH_START, limit_amount: input.limit }); setAddingBudget(false); });
+  }
+
+  async function openDetail(id: string) {
     setDetailId(id);
     setVoidConfirm(false);
+    try {
+      const revisions = await listFinanceRevisions(id);
+      setTransactions((current) => current.map((transaction) => transaction.id === id ? { ...transaction, revisions: revisions.data.map((revision: FinanceRevisionDto) => ({ action: revision.action, at: revision.changed_at })) } : transaction));
+    } catch (error) { setErrorMessage(messageOf(error)); }
+  }
+  async function correctBudget(limit: string) {
+    const budget = budgets.find((item) => item.id === editingBudgetId); if (!budget) return;
+    await complete(async () => { await patchFinanceBudget(budget.id, budget.version, limit); setEditingBudgetId(null); });
   }
 
   const correcting = accountById(correctingId ?? undefined) ?? null;
+  const editing = transactions.find((transaction) => transaction.id === editingId && transaction.type !== "transfer") ?? null;
+  const editingTransfer = transactions.find((transaction) => transaction.id === editingId && transaction.type === "transfer") ?? null;
+  const editingBudget = budgets.find((budget) => budget.id === editingBudgetId) ?? null;
   const budgetlessExpenseCats = categories.filter((c) => c.type === "expense" && !c.archived && !budgets.some((b) => b.categoryId === c.id));
 
   return (
     <AppShell active="finance" title="Finance">
       <div className="page-head">
         <h1>Finance</h1>
-        <span className="sample-tag">Sample data</span>
       </div>
+
+      {errorMessage && <div className="error-banner" role="alert"><span>{errorMessage}</span><button type="button" className="btn btn-sm" onClick={() => { setErrorMessage(undefined); setLoading(true); refresh().catch((error) => setErrorMessage(messageOf(error))).finally(() => setLoading(false)); }}>Retry</button></div>}
+      {loading && <div className="empty-state" aria-live="polite"><h1>Loading finance data</h1><p>Reading accounts, transactions, categories, and budgets from Tracker.</p></div>}
 
       <div className="toolbar" style={{ borderBottom: "1px solid var(--line)" }}>
         <div className="seg" role="tablist" aria-label="Finance section">
@@ -624,7 +688,7 @@ export default function FinancePage() {
               <div className="fin-total-label">Total across {activeAccounts.length} active account{activeAccounts.length === 1 ? "" : "s"}</div>
               <div className="fin-total">
                 <span className="cur">Rp</span>
-                {Math.round(totalActive).toLocaleString("en-US")}
+                {totalActive.toLocaleString("en-US")}
               </div>
               <p className="fin-note">Computed from posted transactions. Excludes drafts and transfers between your own accounts, which never change your total.</p>
             </div>
@@ -660,15 +724,10 @@ export default function FinancePage() {
                 </div>
                 <div className="fin-acct-bal">{rp(balanceOf(a.id))}</div>
                 <div>
-                  {a.archived ? (
-                    <button type="button" className="btn btn-sm" onClick={() => toggleAccountArchived(a.id)}>
-                      Unarchive
-                    </button>
-                  ) : (
-                    <button type="button" className="btn btn-sm" onClick={() => setCorrectingId(a.id)}>
-                      Correct opening balance
-                    </button>
-                  )}
+                  {!a.archived && <div style={{ display: "flex", gap: 8 }}>
+                    <button type="button" className="btn btn-sm" onClick={() => setCorrectingId(a.id)}>Correct opening balance</button>
+                    <button type="button" className="btn btn-sm btn-quiet" onClick={() => toggleAccountArchived(a.id)}>Archive</button>
+                  </div>}
                 </div>
               </div>
             ))}
@@ -676,7 +735,7 @@ export default function FinancePage() {
 
           <div className="fin-section-head">
             <h2>Categories</h2>
-            <span className="field-hint">Income and expense are separate; a category&apos;s type can&apos;t change once created.</span>
+            <button type="button" className="btn btn-sm" onClick={() => setAddingCategory(true)}><IconPlus width={16} height={16} /> New category</button>
           </div>
           <div className="fin-cat-cols">
             {(["income", "expense"] as CatType[]).map((ct) => (
@@ -690,9 +749,7 @@ export default function FinancePage() {
                         <span>
                           {c.name} {c.archived && <span className="chip">Archived</span>}
                         </span>
-                        <button type="button" className="btn btn-sm btn-quiet" onClick={() => toggleCategoryArchived(c.id)}>
-                          {c.archived ? "Unarchive" : "Archive"}
-                        </button>
+                        {!c.archived && <button type="button" className="btn btn-sm btn-quiet" onClick={() => toggleCategoryArchived(c.id)}>Archive</button>}
                       </div>
                     ))}
                 </div>
@@ -799,7 +856,7 @@ export default function FinancePage() {
         <>
           <div className="fin-section-head" style={{ marginTop: 8 }}>
             <div className="fin-budget-month">
-              <h2>September 2026</h2>
+              <h2>{new Date(`${MONTH_START}T00:00:00`).toLocaleDateString("en-US", { month: "long", year: "numeric" })}</h2>
             </div>
             <button type="button" className="btn btn-primary btn-sm" disabled={budgetlessExpenseCats.length === 0} onClick={() => setAddingBudget(true)}>
               <IconPlus width={16} height={16} /> Add budget
@@ -822,7 +879,7 @@ export default function FinancePage() {
                 const cat = categoryById(b.categoryId);
                 const actual = budgetActual(b.categoryId);
                 const over = actual > b.limit;
-                const pct = b.limit === 0 ? 0 : Math.min(100, Math.round((actual / b.limit) * 100));
+                const pct = b.limit === 0n ? 0 : Number((actual * 100n) / b.limit > 100n ? 100n : (actual * 100n) / b.limit);
                 return (
                   <div className={`fin-budget-row${over ? " is-over" : ""}`} key={b.id}>
                     <div className="fin-budget-head">
@@ -836,6 +893,10 @@ export default function FinancePage() {
                     </div>
                     <div className="fin-budget-bar">
                       <i className={`fin-budget-fill${over ? " is-over" : ""}`} style={{ width: `${over ? 100 : pct}%` }} />
+                    </div>
+                    <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                      <button type="button" className="btn btn-sm" onClick={() => setEditingBudgetId(b.id)}>Correct limit</button>
+                      <button type="button" className="btn btn-sm btn-quiet" onClick={() => { if (window.confirm("Remove this monthly budget? Transactions will be kept.")) void complete(async () => { await deleteFinanceBudget(b.id, b.version); }); }}>Remove budget</button>
                     </div>
                   </div>
                 );
@@ -855,6 +916,12 @@ export default function FinancePage() {
         </Modal>
       )}
 
+      {addingCategory && (
+        <Modal title="New category" onClose={() => setAddingCategory(false)}>
+          <CategoryForm onCancel={() => setAddingCategory(false)} onSave={addCategory} />
+        </Modal>
+      )}
+
       {correcting && (
         <Modal title={`Correct opening balance: ${correcting.name}`} onClose={() => setCorrectingId(null)}>
           <OpeningBalanceForm account={correcting} onCancel={() => setCorrectingId(null)} onSave={(v) => correctOpening(correcting.id, v)} />
@@ -867,6 +934,18 @@ export default function FinancePage() {
         </Modal>
       )}
 
+      {editing && (
+        <Modal title="Correct transaction" onClose={() => setEditingId(null)}>
+          <TransactionForm initial={editing} accounts={accounts} categories={categories} onCancel={() => setEditingId(null)} onSave={correctTransaction} />
+        </Modal>
+      )}
+
+      {editingTransfer && (
+        <Modal title="Correct transfer" onClose={() => setEditingId(null)}>
+          <TransferForm initial={editingTransfer} accounts={accounts} balanceOf={balanceOf} onCancel={() => setEditingId(null)} onSave={correctTransfer} />
+        </Modal>
+      )}
+
       {transferring && (
         <Modal title="Transfer between accounts" onClose={() => setTransferring(false)}>
           <TransferForm accounts={accounts} balanceOf={balanceOf} onCancel={() => setTransferring(false)} onSave={addTransfer} />
@@ -876,6 +955,12 @@ export default function FinancePage() {
       {addingBudget && (
         <Modal title="New budget" onClose={() => setAddingBudget(false)}>
           <BudgetForm options={budgetlessExpenseCats} onCancel={() => setAddingBudget(false)} onSave={addBudget} />
+        </Modal>
+      )}
+
+      {editingBudget && (
+        <Modal title="Correct budget" onClose={() => setEditingBudgetId(null)}>
+          <BudgetLimitForm budget={editingBudget} category={categoryById(editingBudget.categoryId)} onCancel={() => setEditingBudgetId(null)} onSave={correctBudget} />
         </Modal>
       )}
 
@@ -921,7 +1006,7 @@ export default function FinancePage() {
                   {[...detailTx.revisions].reverse().map((r, i) => (
                     <div className="detail-hist-row" key={i}>
                       <span className="dh-k" style={{ color: "var(--ink-soft)", fontWeight: 600 }}>
-                        {r.action === "created" ? (detailTx.status === "draft" ? "Created as draft" : "Created") : r.action === "posted" ? "Posted" : r.action === "voided" ? "Voided" : `Edited${r.note ? ` · ${r.note}` : ""}`}
+                        {r.action === "created" ? (detailTx.status === "draft" ? "Created as draft" : "Created") : r.action === "posted" ? "Posted" : r.action === "voided" ? "Voided" : "Edited"}
                       </span>
                       <span className="tnum">{fmtRevTime(r.at)}</span>
                     </div>
@@ -934,13 +1019,14 @@ export default function FinancePage() {
                       Confirm &amp; post
                     </button>
                     <button type="button" className="btn btn-danger" onClick={() => cancelDraft(detailTx.id)}>
-                      Cancel draft
+                      Void draft
                     </button>
                   </div>
                 )}
 
                 {detailTx.status === "posted" && !voidConfirm && (
                   <div className="detail-actions">
+                    <button type="button" className="btn" onClick={() => { setDetailId(null); setEditingId(detailTx.id); }}>Correct</button>
                     <button type="button" className="btn btn-danger" onClick={() => setVoidConfirm(true)}>
                       Void
                     </button>

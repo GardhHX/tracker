@@ -1,27 +1,27 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import AppShell from "@/components/AppShell";
 import Modal from "@/components/Modal";
 import { IconPlus, IconRepeat } from "@/components/icons";
+import { archiveHabit, createHabit, deleteHabitCheckIn, listHabitCheckIns, listHabits, listHabitSchedules, patchHabit, setHabitCheckIn, setHabitSchedule, TrackerApiError } from "@/lib/api";
 
 // weekdays: 7 booleans, index 0 = Monday … 6 = Sunday (matches ISO week start).
 type Weekdays = [boolean, boolean, boolean, boolean, boolean, boolean, boolean];
 
 type Habit = {
   id: string;
+  version: number;
   name: string;
   startDate: string; // ISO date, immutable after creation
   timezone: string; // fixed snapshot, "Asia/Jakarta"
   weekdays: Weekdays;
   checkIns: string[]; // ISO dates
+  schedules: { effectiveFrom: string; weekdays: Weekdays }[];
   archivedOn?: string; // ISO date; when set, habit is archived
 };
 
 const WEEKDAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
 const TZ = "Asia/Jakarta";
-
-// Fixed "today" so the sample week and calendar stay reproducible regardless of
-// the real device clock. Sample data only, per the "Sample data" tag.
-const DEMO_TODAY = "2026-09-19"; // a Saturday
+const TODAY = toISO(new Date());
 
 function parse(iso: string) {
   return new Date(iso + "T00:00:00");
@@ -46,44 +46,14 @@ function fmtDateLong(iso: string) {
 }
 
 function isScheduled(habit: Habit, iso: string) {
-  return habit.weekdays[weekdayIndex(iso)];
+  const schedule = [...habit.schedules].reverse().find((item) => item.effectiveFrom <= iso);
+  return (schedule?.weekdays ?? habit.weekdays)[weekdayIndex(iso)];
 }
 function withinLife(habit: Habit, iso: string) {
   if (iso < habit.startDate) return false;
   if (habit.archivedOn && iso > habit.archivedOn) return false;
   return true;
 }
-
-const SEED_HABITS: Habit[] = [
-  {
-    id: "h1",
-    name: "Read 10 pages",
-    startDate: "2026-08-03",
-    timezone: TZ,
-    weekdays: [true, true, false, true, false, true, false], // Mon, Tue, Thu, Sat
-    checkIns: [
-      "2026-09-01", "2026-09-03", "2026-09-07", "2026-09-08",
-      "2026-09-12", "2026-09-14", "2026-09-15", "2026-09-17",
-    ],
-  },
-  {
-    id: "h2",
-    name: "Morning run",
-    startDate: "2026-09-01",
-    timezone: TZ,
-    weekdays: [false, true, false, true, false, true, false], // Tue, Thu, Sat
-    checkIns: ["2026-09-01", "2026-09-05", "2026-09-15", "2026-09-19"],
-  },
-  {
-    id: "h3",
-    name: "Meditate 5 min",
-    startDate: "2026-08-15",
-    timezone: TZ,
-    weekdays: [true, false, true, false, true, false, false], // Mon, Wed, Fri
-    checkIns: ["2026-09-02", "2026-09-04", "2026-09-07", "2026-09-09"],
-    archivedOn: "2026-09-12",
-  },
-];
 
 function WeekdayPicker({ value, onChange, idBase }: { value: Weekdays; onChange: (v: Weekdays) => void; idBase: string }) {
   return (
@@ -108,9 +78,11 @@ function WeekdayPicker({ value, onChange, idBase }: { value: Weekdays; onChange:
   );
 }
 
-function NewHabitForm({ onCancel, onSave }: { onCancel: () => void; onSave: (h: Omit<Habit, "id" | "checkIns" | "timezone" | "archivedOn">) => void }) {
+type NewHabit = Pick<Habit, "name" | "startDate" | "weekdays">;
+
+function NewHabitForm({ onCancel, onSave }: { onCancel: () => void; onSave: (h: NewHabit) => void }) {
   const [name, setName] = useState("");
-  const [startDate, setStartDate] = useState(DEMO_TODAY);
+  const [startDate, setStartDate] = useState(TODAY);
   const [weekdays, setWeekdays] = useState<Weekdays>([true, false, false, true, false, true, false]);
   const [error, setError] = useState<string | undefined>();
 
@@ -202,44 +174,96 @@ function EditScheduleForm({ habit, onCancel, onSave, onArchive }: { habit: Habit
 }
 
 export default function HabitsPage() {
-  const [habits, setHabits] = useState<Habit[]>(SEED_HABITS);
+  const [habits, setHabits] = useState<Habit[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [pageError, setPageError] = useState<string>();
+  const [saving, setSaving] = useState(false);
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  const weekStart = startOfWeek(DEMO_TODAY);
+  const weekStart = startOfWeek(TODAY);
   const weekDates = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
 
   const activeHabits = habits.filter((h) => !h.archivedOn);
   const archivedHabits = habits.filter((h) => h.archivedOn);
   const editingHabit = habits.find((h) => h.id === editingId) ?? null;
 
+  useEffect(() => {
+    let active = true;
+    async function load() {
+      try {
+        const result = await listHabits("all");
+        const monthStart = `${TODAY.slice(0, 8)}01`;
+        const historyFrom = startOfWeek(TODAY) < monthStart ? startOfWeek(TODAY) : monthStart;
+        const rows = await Promise.all(result.data.map(async (item) => {
+          const [schedules, checkIns] = await Promise.all([listHabitSchedules(item.id), listHabitCheckIns(item.id, historyFrom, TODAY)]);
+          const toWeekdays = (days: number[]) => Array.from({ length: 7 }, (_, index) => days.includes(index + 1)) as Weekdays;
+          return { id: item.id, version: item.version, name: item.name, startDate: item.start_date, timezone: item.timezone, weekdays: toWeekdays(item.current_schedule.weekdays), schedules: schedules.data.map((schedule) => ({ effectiveFrom: schedule.effective_from, weekdays: toWeekdays(schedule.weekdays) })), checkIns: checkIns.data.map((entry) => entry.date), archivedOn: item.archived_on ?? undefined } satisfies Habit;
+        }));
+        if (active) setHabits(rows);
+      } catch (error) {
+        if (active) setPageError(error instanceof TrackerApiError ? error.message : "Habits could not be loaded.");
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    void load();
+    return () => { active = false; };
+  }, []);
+
   function hasCheckIn(habit: Habit, iso: string) {
     return habit.checkIns.includes(iso);
   }
 
-  function toggleCheckIn(habitId: string, iso: string) {
-    setHabits((prev) =>
-      prev.map((h) => {
-        if (h.id !== habitId) return h;
-        const has = h.checkIns.includes(iso);
-        return { ...h, checkIns: has ? h.checkIns.filter((d) => d !== iso) : [...h.checkIns, iso] };
-      })
-    );
+  async function toggleCheckIn(habitId: string, iso: string) {
+    const habit = habits.find((item) => item.id === habitId);
+    if (!habit || saving) return;
+    setSaving(true); setPageError(undefined);
+    try {
+      const has = habit.checkIns.includes(iso);
+      if (has) await deleteHabitCheckIn(habitId, iso); else await setHabitCheckIn(habitId, iso);
+      setHabits((prev) => prev.map((item) => item.id === habitId ? { ...item, checkIns: has ? item.checkIns.filter((date) => date !== iso) : [...item.checkIns, iso] } : item));
+    } catch (error) {
+      setPageError(error instanceof TrackerApiError ? error.message : "The check-in could not be saved.");
+    } finally { setSaving(false); }
   }
 
-  function addHabit(input: Omit<Habit, "id" | "checkIns" | "timezone" | "archivedOn">) {
-    setHabits((prev) => [...prev, { ...input, id: `h-${Date.now()}`, timezone: TZ, checkIns: [] }]);
-    setAdding(false);
+  async function addHabit(input: NewHabit) {
+    setSaving(true); setPageError(undefined);
+    try {
+      const created = await createHabit({ name: input.name, start_date: input.startDate, weekdays: input.weekdays.flatMap((enabled, index) => enabled ? [index + 1] : []) });
+      setHabits((prev) => [...prev, { id: created.id, version: created.version, name: created.name, startDate: created.start_date, timezone: created.timezone, weekdays: input.weekdays, schedules: [{ effectiveFrom: created.current_schedule.effective_from, weekdays: input.weekdays }], checkIns: [] }]);
+      setAdding(false);
+    } catch (error) { setPageError(error instanceof TrackerApiError ? error.message : "The habit could not be created."); }
+    finally { setSaving(false); }
   }
 
-  function saveSchedule(habitId: string, name: string, weekdays: Weekdays) {
-    setHabits((prev) => prev.map((h) => (h.id === habitId ? { ...h, name, weekdays } : h)));
-    setEditingId(null);
+  async function saveSchedule(habitId: string, name: string, weekdays: Weekdays) {
+    const habit = habits.find((item) => item.id === habitId); if (!habit) return;
+    setSaving(true); setPageError(undefined);
+    try {
+      let updated = habit;
+      if (name !== habit.name) {
+        const value = await patchHabit(habitId, { version: updated.version, name });
+        updated = { ...updated, name: value.name, version: value.version };
+      }
+      if (weekdays.some((value, index) => value !== habit.weekdays[index])) {
+        const value = await setHabitSchedule(habitId, { version: updated.version, weekdays: weekdays.flatMap((enabled, index) => enabled ? [index + 1] : []) });
+        const schedules = await listHabitSchedules(habitId);
+        const toWeekdays = (days: number[]) => Array.from({ length: 7 }, (_, index) => days.includes(index + 1)) as Weekdays;
+        updated = { ...updated, weekdays: toWeekdays(value.current_schedule.weekdays), version: value.version, schedules: schedules.data.map((item) => ({ effectiveFrom: item.effective_from, weekdays: toWeekdays(item.weekdays) })) };
+      }
+      setHabits((prev) => prev.map((item) => item.id === habitId ? updated : item)); setEditingId(null);
+    } catch (error) { setPageError(error instanceof TrackerApiError ? error.message : "The habit could not be updated."); }
+    finally { setSaving(false); }
   }
 
-  function toggleArchive(habitId: string) {
-    setHabits((prev) => prev.map((h) => (h.id === habitId ? { ...h, archivedOn: h.archivedOn ? undefined : DEMO_TODAY } : h)));
-    setEditingId(null);
+  async function archive(habitId: string) {
+    const habit = habits.find((item) => item.id === habitId); if (!habit) return;
+    setSaving(true); setPageError(undefined);
+    try { const value = await archiveHabit(habitId, habit.version); setHabits((prev) => prev.map((item) => item.id === habitId ? { ...item, version: value.version, archivedOn: value.archived_on ?? undefined } : item)); setEditingId(null); }
+    catch (error) { setPageError(error instanceof TrackerApiError ? error.message : "The habit could not be archived."); }
+    finally { setSaving(false); }
   }
 
   // "check-ins this week" over "scheduled days this week"; no scheduled days -> honest text (PRD).
@@ -250,8 +274,8 @@ export default function HabitsPage() {
   }
 
   function todayState(habit: Habit) {
-    const scheduledToday = isScheduled(habit, DEMO_TODAY) && withinLife(habit, DEMO_TODAY);
-    const checkedToday = hasCheckIn(habit, DEMO_TODAY);
+    const scheduledToday = isScheduled(habit, TODAY) && withinLife(habit, TODAY);
+    const checkedToday = hasCheckIn(habit, TODAY);
     return { scheduledToday, checkedToday };
   }
 
@@ -262,7 +286,7 @@ export default function HabitsPage() {
           const scheduled = isScheduled(habit, d) && withinLife(habit, d);
           const checked = hasCheckIn(habit, d);
           const cls = !scheduled ? "hp-dot is-off" : checked ? "hp-dot is-on" : "hp-dot is-scheduled";
-          const isToday = d === DEMO_TODAY;
+          const isToday = d === TODAY;
           return (
             <span key={d} className={`hp-day${isToday ? " is-today" : ""}`}>
               <span className="hp-day-label">{WEEKDAY_LABELS[i]}</span>
@@ -289,9 +313,9 @@ export default function HabitsPage() {
     );
   }
 
-  // Month grid of DEMO_TODAY's month, using the same dot vocabulary.
+  // Current month uses the same dot vocabulary as the weekly view.
   function renderHistory(habit: Habit) {
-    const monthStart = DEMO_TODAY.slice(0, 8) + "01";
+    const monthStart = TODAY.slice(0, 8) + "01";
     const year = parse(monthStart).getFullYear();
     const month = parse(monthStart).getMonth();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -317,7 +341,7 @@ export default function HabitsPage() {
             const inLife = withinLife(habit, iso);
             const scheduled = inLife && isScheduled(habit, iso);
             const checked = hasCheckIn(habit, iso);
-            const future = iso > DEMO_TODAY;
+            const future = iso > TODAY;
             if (!inLife) return <span key={iso} className="cal-cell is-blank" aria-hidden />;
             if (!scheduled) return <span key={iso} className="cal-cell is-off" title="Not scheduled">{day}</span>;
             // Scheduled: past can be corrected; future cannot be checked.
@@ -356,14 +380,15 @@ export default function HabitsPage() {
     <AppShell active="habits" title="Habits">
       <div className="page-head">
         <h1>Habits</h1>
-        <span className="sample-tag">Sample data</span>
+        <span className="sample-tag">Saved account data</span>
         <span style={{ flex: 1 }} />
         <button type="button" className="btn btn-primary btn-sm" onClick={() => setAdding(true)}>
           <IconPlus width={16} height={16} /> New habit
         </button>
       </div>
 
-      {habits.length === 0 ? (
+      {pageError && <div className="form-alert error" role="alert" style={{ marginBottom: 16 }}>{pageError}</div>}
+      {loading ? <div className="empty-state"><p>Loading habits…</p></div> : habits.length === 0 ? (
         <div className="empty-state">
           <span className="es-ic" aria-hidden>
             <IconRepeat width={22} height={22} />
@@ -426,7 +451,7 @@ export default function HabitsPage() {
                       aria-pressed={checkedToday}
                       disabled={!scheduledToday}
                       title={!scheduledToday ? "Today is not a scheduled day for this habit" : undefined}
-                      onClick={() => toggleCheckIn(habit.id, DEMO_TODAY)}
+                      onClick={() => void toggleCheckIn(habit.id, TODAY)}
                     >
                       {checkedToday ? "Undo check-in" : scheduledToday ? "Check in today" : "Not scheduled today"}
                     </button>
@@ -451,9 +476,7 @@ export default function HabitsPage() {
                   <div className="habit-card-body">
                     {renderWeek(habit)}
                     <div className="habit-actions">
-                      <button type="button" className="btn btn-sm" onClick={() => toggleArchive(habit.id)}>
-                        Unarchive
-                      </button>
+                      <span className="field-hint">Archived habits cannot be reopened.</span>
                     </div>
                   </div>
                   <p className="field-hint" style={{ marginTop: 12 }}>
@@ -469,7 +492,7 @@ export default function HabitsPage() {
 
       {adding && (
         <Modal title="New habit" onClose={() => setAdding(false)}>
-          <NewHabitForm onCancel={() => setAdding(false)} onSave={addHabit} />
+          <NewHabitForm onCancel={() => setAdding(false)} onSave={(value) => void addHabit(value)} />
         </Modal>
       )}
 
@@ -478,8 +501,8 @@ export default function HabitsPage() {
           <EditScheduleForm
             habit={editingHabit}
             onCancel={() => setEditingId(null)}
-            onSave={(name, weekdays) => saveSchedule(editingHabit.id, name, weekdays)}
-            onArchive={() => toggleArchive(editingHabit.id)}
+            onSave={(name, weekdays) => void saveSchedule(editingHabit.id, name, weekdays)}
+            onArchive={() => void archive(editingHabit.id)}
           />
         </Modal>
       )}

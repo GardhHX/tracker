@@ -13,5 +13,11 @@ export default defineConfig({
     host: "127.0.0.1",
     port: Number(process.env.PORT) || 3000,
     strictPort: false,
+    proxy: {
+      "/api": {
+        target: process.env.API_PROXY_TARGET || "http://127.0.0.1:4000",
+        changeOrigin: true,
+      },
+    },
   },
 });
