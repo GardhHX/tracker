@@ -2,7 +2,7 @@
 
 Tracker adalah rancangan aplikasi web responsif untuk mengelola aktivitas pribadi, keuangan, dan proyek dalam satu akun.
 
-Status per 20 September 2026: dokumentasi spesifikasi 0.4 tersedia, serta frontend SPA (Vite + React) dengan landing page, UI akun, dan halaman modul siap dihubungkan. Backend autentikasi, database, migrasi, dan modul bisnis **belum diimplementasikan**. Kebutuhan berasal dari percakapan perencanaan, bukan riset pengguna atau pengukuran penggunaan. Revisi 0.2 mengganti pencatat waktu bebas menjadi Pomodoro. Revisi 0.3 menetapkan Timebox, siklus Pomodoro harian, default UI Inggris, kemampuan turunan di modul sumber, dashboard tanpa rincian keuangan, serta logout semua perangkat. Revisi 0.4 menyelaraskan keputusan teknis ke implementasi nyata: frontend adalah SPA Vite + React (bukan Next.js), backend menjadi API Node terpisah (Express), dan database memakai Supabase (PostgreSQL terkelola); model auth custom tetap. Lihat [DECISIONS](DECISIONS.md) D-40..D-45.
+Status per 22 September 2026: dokumentasi spesifikasi 0.4 tersedia. Frontend SPA (Vite + React) terhubung ke API Express untuk autentikasi serta modul M1, M2, dan M3. Migrasi M0 sampai M3 telah diterapkan ke database pengembangan Supabase; lihat [status backend](api/STATUS.md). M2 mencakup Habit, Timebox, dan Pomodoro dengan deadline server serta pemulihan setelah reload. M3 mencakup akun keuangan, kategori, transaksi/transfer, revision history, dan anggaran persisten. Modul M4 dan seterusnya belum diimplementasikan. Kebutuhan berasal dari percakapan perencanaan, bukan riset pengguna atau pengukuran penggunaan. Revisi 0.2 mengganti pencatat waktu bebas menjadi Pomodoro. Revisi 0.3 menetapkan Timebox, siklus Pomodoro harian, default UI Inggris, kemampuan turunan di modul sumber, dashboard tanpa rincian keuangan, serta logout semua perangkat. Revisi 0.4 menyelaraskan keputusan teknis ke implementasi nyata: frontend adalah SPA Vite + React (bukan Next.js), backend menjadi API Node terpisah (Express), dan database memakai Supabase (PostgreSQL terkelola); model auth custom tetap. Lihat [DECISIONS](DECISIONS.md) D-40..D-45.
 
 ## Dokumen
 
@@ -35,7 +35,7 @@ PRD menetapkan perilaku produk; SCHEMA merinci data; API-SPEC menetapkan kontrak
 
 Contoh payload dan data pada dokumen serta carousel adalah data sintetis berlabel contoh.
 
-## Menjalankan landing page
+## Menjalankan aplikasi lokal
 
 Frontend adalah SPA Vite + React 19 + TypeScript. Proyek ini menggunakan Node.js 24 atau lebih baru. Jalankan dari folder proyek:
 
@@ -44,19 +44,30 @@ npm ci
 npm run dev
 ```
 
-Buka http://127.0.0.1:3000. Untuk build produksi jalankan `npm run build` (menghasilkan aset statis di `dist/`), lalu `npm run preview` untuk melayaninya secara lokal di port 3000. Pemeriksaan tipe: `npm run typecheck`. Skrip yang tersedia saat ini: `dev`, `build`, `preview`, `typecheck` (lihat [package.json](package.json)); suite tes otomatis (unit/integration/E2E) baru dijadwalkan pada tahap backend di [PLAN](PLAN.md) dan belum dikonfigurasi.
+Jalankan API di terminal kedua:
+
+```bash
+cd api
+npm ci
+npm run dev
+```
+
+Buka http://127.0.0.1:3000. Vite meneruskan permintaan `/api` ke Express di `http://127.0.0.1:4000`; target dapat diubah lewat `API_PROXY_TARGET`. Untuk build produksi jalankan `npm run build` (menghasilkan aset statis di `dist/`), lalu `npm run preview`. Pemeriksaan frontend tersedia melalui `npm test`, `npm run typecheck`, dan `npm run build`.
+
+Backend menyediakan `npm test`, `npm run test:integration`, `npm run typecheck`, dan `npm run build`. Integration test PostgreSQL hanya berjalan bila `RUN_POSTGRES_INTEGRATION=1` dan database sudah dimigrasikan. Workflow `.github/workflows/ci.yml` menyiapkan PostgreSQL 17 dan menjalankan seluruh pemeriksaan tersebut pada push serta pull request.
 
 ## Cakupan UI
 
 - `/`: landing page, carousel empat modul, FAQ, menu ponsel, serta tema terang/gelap.
-- `/login`, `/register`, `/forgot-password`, `/verify-email`: UI akun dengan validasi dan status permintaan; kirim ulang verifikasi dan reset kata sandi ditangani di dalam halaman terkait (belum sebagai rute tersendiri).
+- `/login`, `/register`: terhubung ke API Express dengan CSRF, cookie session, status loading/error, dan redirect login sukses ke `/dashboard`; tombol Google memakai endpoint OAuth backend.
+- `/forgot-password`, `/verify-email`: UI akun tersedia, tetapi integrasi API frontend masih perlu diselesaikan.
 - `/privacy`: keterangan data pratinjau, bukan kebijakan produksi.
-- `/dashboard`: kerangka dashboard dengan widget contoh (Timebox, tugas, kebiasaan, Pomodoro), tanpa rincian keuangan; data di memori tab, belum terhubung server.
-- `/tasks`: List/Kanban/History atas satu data client-side yang sama, filter status/proyek/tenggat/arsip, dependensi antar-tugas, dan riwayat penyelesaian; data contoh tersimpan di memori tab, belum terhubung server (lihat PLAN.md, M1).
-- `/habits`: kartu habit dengan jadwal hari-dalam-minggu, check-in per tanggal, rasio mingguan, kalender riwayat yang dapat dikoreksi, edit jadwal, dan arsip; zona habit tetap; data contoh di memori tab, belum terhubung server (lihat PLAN.md, M2).
-- `/pomodoro`: timer fokus/istirahat dengan durasi tetap 25/5/15, satu sesi berjalan, pause/resume/cancel, siklus harian (fokus keempat → long break), hitungan fokus, dan riwayat sesi; deadline disimulasikan di tab, belum terhubung server (lihat PLAN.md, M2).
-- `/projects`: daftar proyek, papan Kanban, tenggat, progres, dan dependensi antar-tugas; data contoh di memori tab, belum terhubung server (lihat PLAN.md, M1).
-- `/finance/accounts`: akun IDR, transaksi manual, transfer, dan saldo; data contoh di memori tab, belum terhubung server (lihat PLAN.md, M3).
+- `/dashboard`: dashboard persisten dengan Timebox, tugas, kebiasaan, dan kontrol Pomodoro, tanpa rincian keuangan.
+- `/tasks`: terhubung ke API M1; menyediakan create/edit, status/reopen, arsip, List/Kanban, filter status/proyek/tenggat/arsip, serta completion history dari snapshot `TaskEvent` immutable. Metadata recurrence tetap `null` sampai M4.
+- `/habits`: habit persisten dengan jadwal berversi, check-in per tanggal, riwayat yang dapat dikoreksi, zona tetap, dan arsip terminal.
+- `/pomodoro`: timer persisten 25/5/15 dengan pause/resume/cancel, siklus harian, deadline server, reload recovery, dan riwayat sesi.
+- `/projects`: terhubung ke API M1; menyediakan create/edit, complete/archive/reopen, progres dari tugas tidak diarsipkan, serta Board/List yang membaca tugas persisten yang sama. Dependensi tugas baru masuk M4.
+- `/finance/accounts`: akun IDR, kategori, transaksi manual, transfer, koreksi/void dengan revision history, saldo terhitung, serta anggaran bulanan persisten melalui API M3.
 - `/settings`: UI profil dan pengaturan akun termasuk penautan Google dan logout semua perangkat; belum terhubung server.
 
-Pengguna memilih frontend SPA (landing, UI akun, dan halaman modul) siap dihubungkan, tanpa pembangunan backend akun. Tahapan M0 sampai M6 dalam PLAN tetap merupakan rencana MVP, bukan klaim telah selesai. Arah visual dan referensi Mobbin yang diperiksa ada di [DESIGN](DESIGN.md).
+Tahapan M0 sampai M6 dalam PLAN tetap merupakan rencana MVP, bukan klaim bahwa seluruh produk telah selesai. Arah visual dan referensi Mobbin yang diperiksa ada di [DESIGN](DESIGN.md).

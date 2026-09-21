@@ -1,6 +1,6 @@
 # Kontrak API Tracker
 
-Versi 0.4. Tanggal: 20 September 2026. Status: kontrak rancangan; endpoint belum diimplementasikan. [SCHEMA](SCHEMA.md) menetapkan data dan constraint; [PRD](PRD.md) menetapkan transisi. Revisi 0.4 hanya mengganti penyedia flow Google OAuth dari Auth.js ke library OIDC di API custom (DECISIONS D-43/D-45); kontrak endpoint, DTO, dan proteksi lain tidak berubah.
+Versi 0.4. Tanggal: 22 September 2026. Status: endpoint M0–M3 diimplementasikan; M4–M6 tetap kontrak rancangan. [SCHEMA](SCHEMA.md) menetapkan data dan constraint; [PRD](PRD.md) menetapkan transisi. Revisi 0.4 hanya mengganti penyedia flow Google OAuth dari Auth.js ke library OIDC di API custom (DECISIONS D-43/D-45); kontrak endpoint, DTO, dan proteksi lain tidak berubah.
 
 ## HTTP, versi, dan idempotensi
 
@@ -114,8 +114,10 @@ UI default Inggris; message API yang ditampilkan juga Inggris, dengan code stabi
 | Endpoint (relatif /api/v1) | Input / filter | DTO |
 |---|---|---|
 | GET/POST /projects; GET/PATCH /projects/:id | create name,description?; patch version,name/description; list status | Project |
+| DELETE /projects/:id | `If-Match:"N"`; soft delete mengubah status menjadi archived dan mempertahankan Task/TaskEvent | 204 |
 | POST /projects/:id/status | version,status; active membersihkan timestamp; blokir fokus/proyek sesuai PRD | Project |
 | GET/POST /tasks; GET/PATCH /tasks/:id | create title,description?,project_id?,priority default medium,due_date?; patch version dan field sama; filter status,priority,project_id,personal,overdue,due_from/due_to,archived | Task |
+| DELETE /tasks/:id | `If-Match:"N"`; soft delete mengarsipkan Task dan menambah TaskEvent archived | 204 |
 | POST /tasks/:id/status | version,status; done diperiksa dependensi/Pomodoro | Task |
 | POST /tasks/:id/archive; /tasks/:id/unarchive | version; arsip/pindah/done terblokir oleh fokus running/paused | Task |
 | GET /tasks/:id/events | from/to,page/page_size; snapshot history tidak disaring arsip terkini | TaskEvent list |
