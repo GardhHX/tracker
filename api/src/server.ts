@@ -5,6 +5,10 @@ import { prisma } from "./lib/prisma.js";
 import { clearGoogleOAuthCookie, clearSessionCookie, createSession, readGoogleOAuthCookie, readSession, seal, setCsrfCookie, setGoogleOAuthCookie, setSessionCookie, verifyCsrf } from "./lib/security.js";
 import { createGoogleProvider } from "./modules/auth/google.js";
 import { createPrismaAuthRepo } from "./modules/auth/repo.prisma.js";
+import { createPostgresRateLimiter } from "./lib/ratelimit.js";
+import { createPrismaM1Service } from "./modules/work/service.prisma.js";
+import { createPrismaM2Service } from "./modules/m2/service.prisma.js";
+import { createPrismaM3Service } from "./modules/finance/service.prisma.js";
 
 const app = createApp({
   repo: createPrismaAuthRepo(prisma),
@@ -22,6 +26,10 @@ const app = createApp({
   },
   allowedOrigins: env.allowedOrigins,
   appOrigin: env.appOrigin,
+  rateLimiter: createPostgresRateLimiter(prisma, env.authSecret),
+  m1: createPrismaM1Service(prisma),
+  m2: createPrismaM2Service(prisma),
+  m3: createPrismaM3Service(prisma),
   ...(googleEnabled
     ? { google: createGoogleProvider({ clientId: env.googleClientId!, clientSecret: env.googleClientSecret!, redirectUri: env.googleRedirectUri }) }
     : {}),

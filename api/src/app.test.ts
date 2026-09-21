@@ -3,6 +3,7 @@ import { createServer, type Server } from "node:http";
 import test from "node:test";
 import { createApp } from "./app.js";
 import { createInMemoryAuthRepo } from "./modules/auth/repo.inmemory.js";
+import type { M1Service, ProjectDto, TaskDto } from "./modules/work/types.js";
 
 function testSecurity() {
   return {
@@ -50,6 +51,48 @@ function updateCookies(jar: string, response: Response) {
   }
   return [...next].map(([name, value]) => `${name}=${value}`).join("; ");
 }
+
+test("allowed browser origins receive credentialed CORS headers", async (t) => {
+  const app = createApp({
+    repo: createInMemoryAuthRepo().repo,
+    security: testSecurity(),
+    allowedOrigins: ["http://127.0.0.1:3000"],
+  });
+  const server = createServer(app);
+  const base = await start(server);
+  t.after(() => server.close());
+
+  const response = await fetch(`${base}/api/v1/auth/login`, {
+    method: "OPTIONS",
+    headers: {
+      origin: "http://127.0.0.1:3000",
+      "access-control-request-method": "POST",
+      "access-control-request-headers": "content-type,x-csrf-token",
+    },
+  });
+
+  assert.equal(response.status, 204);
+  assert.equal(response.headers.get("access-control-allow-origin"), "http://127.0.0.1:3000");
+  assert.equal(response.headers.get("access-control-allow-credentials"), "true");
+  assert.match(response.headers.get("access-control-allow-headers") ?? "", /X-CSRF-Token/i);
+});
+
+test("unknown browser origins remain blocked", async (t) => {
+  const app = createApp({
+    repo: createInMemoryAuthRepo().repo,
+    security: testSecurity(),
+    allowedOrigins: ["http://127.0.0.1:3000"],
+  });
+  const server = createServer(app);
+  const base = await start(server);
+  t.after(() => server.close());
+
+  const response = await fetch(`${base}/api/v1/auth/csrf`, {
+    headers: { origin: "https://untrusted.example" },
+  });
+  assert.equal(response.status, 403);
+  assert.equal((await response.json() as { error: { code: string } }).error.code, "CSRF_INVALID");
+});
 
 test("auth HTTP flow enforces CSRF, creates a session, and invalidates logout-all", async (t) => {
   const store = createInMemoryAuthRepo();
@@ -275,4 +318,126 @@ test("login rate limit returns 429 with Retry-After after the limit is exceeded"
   assert.equal(response.headers.get("retry-after"), "30");
   const body = (await response.json()) as { error: { code: string } };
   assert.equal(body.error.code, "RATE_LIMITED");
+});
+
+test("email-producing endpoints enforce the shared recipient limit", async (t) => {
+  const store = createInMemoryAuthRepo();
+  const checkedKeys: string[] = [];
+  const app = createApp({
+    repo: store.repo,
+    security: testSecurity(),
+    allowedOrigins: [],
+    rateLimiter: {
+      async check(key) {
+        checkedKeys.push(key);
+        return key.startsWith("email-send:email:")
+          ? { allowed: false, retryAfterSeconds: 600 }
+          : { allowed: true, retryAfterSeconds: 0 };
+      },
+    },
+  });
+  const server = createServer(app);
+  const base = await start(server);
+  t.after(() => server.close());
+
+  let response = await fetch(`${base}/api/v1/auth/csrf`);
+  const csrf = (await response.json() as { data: { token: string } }).data.token;
+  const cookies = updateCookies("", response);
+  response = await fetch(`${base}/api/v1/auth/register`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-csrf-token": csrf, cookie: cookies },
+    body: JSON.stringify({ name: "Ada", email: "ADA@EXAMPLE.COM", password: "x".repeat(12) }),
+  });
+
+  assert.equal(response.status, 429);
+  assert.equal(response.headers.get("retry-after"), "600");
+  assert.deepEqual(checkedKeys, ["email-send:email:ada@example.com"]);
+  assert.equal(await store.repo.findUserByEmail("ada@example.com"), undefined);
+});
+
+test("M1 HTTP routes require verified sessions, validate input, and forward idempotency", async (t) => {
+  const store = createInMemoryAuthRepo();
+  const verified = await store.repo.createUserWithState({ name: "Verified", email: "verified@example.com", passwordHash: "hash", emailVerifiedAt: new Date() });
+  const task: TaskDto = {
+    id: "11111111-1111-4111-8111-111111111111", version: 1, created_at: "2026-09-21T00:00:00.000Z", updated_at: "2026-09-21T00:00:00.000Z",
+    project_id: null, title: "M1 task", description: null, status: "todo", priority: "medium", due_date: null, completed_at: null, archived_at: null,
+    recurrence_rule_id: null, occurrence_date: null, rule_version: null,
+  };
+  const project: ProjectDto = {
+    id: "22222222-2222-4222-8222-222222222222", version: 1, created_at: "2026-09-21T00:00:00.000Z", updated_at: "2026-09-21T00:00:00.000Z",
+    name: "M1 project", description: null, status: "active", completed_at: null, archived_at: null, done_count: 0, task_count: 0, progress_percent: 0,
+  };
+  const calls: Array<{ userId: string; key: string }> = [];
+  const archiveCalls: Array<{ userId: string; id: string; version: number; archived: boolean }> = [];
+  const projectStatusCalls: Array<{ userId: string; id: string; version: number; status: string }> = [];
+  const unsupported = async () => { throw new Error("unexpected M1 service call"); };
+  const m1: M1Service = {
+    listProjects: unsupported, getProject: unsupported, createProject: unsupported, patchProject: unsupported,
+    async setProjectStatus(userId, id, input) {
+      projectStatusCalls.push({ userId, id, ...input });
+      return { ...project, status: input.status, archived_at: input.status === "archived" ? "2026-09-21T01:00:00.000Z" : null };
+    },
+    async listTasks(_userId, query) { return { data: [task], meta: { page: query.page, page_size: query.pageSize, total: 1 } }; },
+    getTask: unsupported,
+    async createTask(userId, input, key) { calls.push({ userId, key }); return { data: { ...task, title: input.title }, status: 201, replayed: false }; },
+    patchTask: unsupported,
+    setTaskStatus: unsupported,
+    async setTaskArchived(userId, id, version, archived) {
+      archiveCalls.push({ userId, id, version, archived });
+      return { ...task, archived_at: archived ? "2026-09-21T01:00:00.000Z" : null };
+    },
+    listTaskEvents: unsupported,
+  };
+  const server = createServer(createApp({ repo: store.repo, security: testSecurity(), allowedOrigins: [], m1 }));
+  const base = await start(server);
+  t.after(() => server.close());
+
+  let response = await fetch(`${base}/api/v1/tasks`, { headers: { cookie: `tracker_session=${verified.id}:1` } });
+  assert.equal(response.status, 200);
+  assert.equal((await response.json() as { meta: { total: number } }).meta.total, 1);
+
+  response = await fetch(`${base}/api/v1/auth/csrf`);
+  const csrf = (await response.json() as { data: { token: string } }).data.token;
+  const csrfCookie = updateCookies("", response);
+  const cookie = `${csrfCookie}; tracker_session=${verified.id}:1`;
+  response = await fetch(`${base}/api/v1/tasks`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-csrf-token": csrf, "idempotency-key": "m1-test-key", cookie },
+    body: JSON.stringify({ title: "Created over HTTP", unknown: true }),
+  });
+  assert.equal(response.status, 422);
+
+  response = await fetch(`${base}/api/v1/tasks`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-csrf-token": csrf, "idempotency-key": "m1-test-key", cookie },
+    body: JSON.stringify({ title: "Created over HTTP" }),
+  });
+  assert.equal(response.status, 201);
+  assert.equal((await response.json() as { data: TaskDto }).data.title, "Created over HTTP");
+  assert.deepEqual(calls, [{ userId: verified.id, key: "m1-test-key" }]);
+
+  response = await fetch(`${base}/api/v1/tasks/${task.id}`, {
+    method: "DELETE",
+    headers: { "x-csrf-token": csrf, cookie },
+  });
+  assert.equal(response.status, 422);
+
+  response = await fetch(`${base}/api/v1/tasks/${task.id}`, {
+    method: "DELETE",
+    headers: { "x-csrf-token": csrf, "if-match": '"7"', cookie },
+  });
+  assert.equal(response.status, 204);
+  assert.deepEqual(archiveCalls, [{ userId: verified.id, id: task.id, version: 7, archived: true }]);
+
+  response = await fetch(`${base}/api/v1/projects/${project.id}`, {
+    method: "DELETE",
+    headers: { "x-csrf-token": csrf, "if-match": "4", cookie },
+  });
+  assert.equal(response.status, 204);
+  assert.deepEqual(projectStatusCalls, [{ userId: verified.id, id: project.id, version: 4, status: "archived" }]);
+
+  const unverified = await store.repo.createUserWithState({ name: "Unverified", email: "unverified@example.com", passwordHash: "hash" });
+  response = await fetch(`${base}/api/v1/tasks`, { headers: { cookie: `tracker_session=${unverified.id}:1` } });
+  assert.equal(response.status, 403);
+  assert.equal((await response.json() as { error: { code: string } }).error.code, "EMAIL_UNVERIFIED");
 });

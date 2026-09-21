@@ -5,6 +5,8 @@ import { unseal } from "./lib/security.js";
 import { createEmailSender, createSmtpTransport } from "./modules/email/mailer.js";
 import { createEmailOutboxProcessor } from "./modules/email/outbox.js";
 import { createPrismaEmailOutboxStore } from "./modules/email/outbox.prisma.js";
+import { cleanupExpiredSecurityData } from "./lib/maintenance.js";
+import { createPrismaM2Service } from "./modules/m2/service.prisma.js";
 
 const controller = new AbortController();
 if (env.nodeEnv === "production" && !env.smtpHost) {
@@ -28,16 +30,42 @@ const processor = createEmailOutboxProcessor(
     maxAttempts: env.emailWorkerMaxAttempts,
   },
 );
+const m2 = createPrismaM2Service(prisma);
 
 async function run() {
   console.info(`[tracker-email-worker] started mode=${transport ? "smtp" : "console-sink"}`);
+  let nextMaintenanceAt = 0;
   while (!controller.signal.aborted) {
+    let count = 0;
     try {
-      const count = await processor.processBatch();
-      if (count >= env.emailWorkerBatchSize) continue;
+      count = await processor.processBatch();
     } catch (error) {
       console.error("[tracker-email-worker] batch failed", error);
     }
+
+    try {
+      const reconciled = await m2.reconcileDueSessions();
+      if (reconciled > 0) console.info(`[tracker-email-worker] reconciled_pomodoro_users=${reconciled}`);
+    } catch (error) {
+      console.error("[tracker-email-worker] Pomodoro reconciliation failed", error);
+    }
+
+    const current = Date.now();
+    if (current >= nextMaintenanceAt) {
+      try {
+        const removed = await cleanupExpiredSecurityData(prisma, new Date(current));
+        if (removed.idempotencyRecords > 0 || removed.rateLimitBuckets > 0) {
+          console.info(
+            `[tracker-email-worker] cleanup idempotency=${removed.idempotencyRecords} rate_limits=${removed.rateLimitBuckets}`,
+          );
+        }
+      } catch (error) {
+        console.error("[tracker-email-worker] cleanup failed", error);
+      }
+      nextMaintenanceAt = current + 60 * 60 * 1000;
+    }
+
+    if (count >= env.emailWorkerBatchSize) continue;
 
     try {
       await wait(env.emailWorkerPollMs, undefined, { signal: controller.signal });
