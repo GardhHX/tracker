@@ -1,4 +1,4 @@
-// Tracker — M0 schema (identitas & sistem) per SCHEMA.md
+// Tracker — schema through M3 (identity/system, work history, habits, Pomodoro, Timebox, finance) per SCHEMA.md
 datasource db {
   provider = "postgresql"
 }
@@ -29,6 +29,100 @@ enum PomodoroPhase {
   long_break
 }
 
+enum PomodoroSessionStatus {
+  running
+  paused
+  completed
+  cancelled
+}
+
+enum TimeboxKind {
+  class
+  task
+  habit
+  focus
+}
+
+enum TimeboxStatus {
+  planned
+  cancelled
+}
+
+enum ProjectStatus {
+  active
+  completed
+  archived
+}
+
+enum TaskStatus {
+  todo
+  in_progress
+  done
+}
+
+enum TaskPriority {
+  low
+  medium
+  high
+}
+
+enum TaskEventType {
+  created
+  edited
+  status_changed
+  project_changed
+  archived
+  unarchived
+}
+
+enum FinanceAccountType {
+  cash
+  bank
+  ewallet
+}
+
+enum FinanceCategoryType {
+  income
+  expense
+}
+
+enum FinanceTransactionType {
+  income
+  expense
+  transfer
+}
+
+enum FinanceTransactionStatus {
+  draft
+  posted
+  void
+}
+
+enum FinanceTransactionRevisionAction {
+  created
+  edited
+  posted
+  voided
+}
+
+enum RecurrenceFrequency {
+  daily
+  weekly
+  monthly
+}
+
+enum RecurrenceStatus {
+  active
+  stopped
+  expired
+}
+
+enum RecurrenceRevisionAction {
+  created
+  edited
+  stopped
+}
+
 model User {
   id                String    @id @default(uuid()) @db.Uuid
   email             String    @unique
@@ -41,14 +135,184 @@ model User {
   created_at        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updated_at        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  auth_accounts    AuthAccount[]
-  auth_tokens      AuthToken[]
-  auth_link_intents AuthLinkIntent[]
-  idempotency_records IdempotencyRecord[]
-  pomodoro_days       PomodoroDay[]
-  pomodoro_state      PomodoroState? @relation("PomodoroStateUser")
+  auth_accounts                 AuthAccount[]
+  auth_tokens                   AuthToken[]
+  auth_link_intents             AuthLinkIntent[]
+  idempotency_records           IdempotencyRecord[]
+  pomodoro_days                 PomodoroDay[]
+  pomodoro_state                PomodoroState?                @relation("PomodoroStateUser")
+  projects                      Project[]
+  tasks                         Task[]
+  task_events                   TaskEvent[]
+  habits                        Habit[]
+  habit_schedules               HabitSchedule[]
+  habit_check_ins               HabitCheckIn[]
+  pomodoro_sessions             PomodoroSession[]
+  pomodoro_intervals            PomodoroInterval[]
+  timebox_entries               TimeboxEntry[]
+  finance_accounts              FinanceAccount[]
+  finance_balance_changes       FinanceAccountBalanceChange[]
+  finance_categories            FinanceCategory[]
+  finance_transactions          FinanceTransaction[]
+  finance_transaction_revisions FinanceTransactionRevision[]
+  budgets                       Budget[]
+  task_recurrence_rules         TaskRecurrenceRule[]
+  task_recurrence_revisions     TaskRecurrenceRevision[]
+  finance_recurrence_rules      FinanceRecurrenceRule[]
+  finance_recurrence_revisions  FinanceRecurrenceRevision[]
+  task_dependencies             TaskDependency[]
 
   @@map("user")
+}
+
+model Project {
+  id           String        @id @default(uuid()) @db.Uuid
+  user_id      String        @map("user_id") @db.Uuid
+  name         String
+  description  String?
+  status       ProjectStatus @default(active)
+  completed_at DateTime?     @map("completed_at") @db.Timestamptz(6)
+  archived_at  DateTime?     @map("archived_at") @db.Timestamptz(6)
+  version      Int           @default(1)
+  created_at   DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at   DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user                    User              @relation(fields: [user_id], references: [id])
+  tasks                   Task[]
+  events_at_project       TaskEvent[]       @relation("TaskEventProject")
+  events_previous_project TaskEvent[]       @relation("TaskEventPreviousProject")
+  pomodoro_sessions       PomodoroSession[] @relation("PomodoroSessionProject")
+  task_recurrence_rules   TaskRecurrenceRule[]
+
+  @@unique([user_id, id])
+  @@index([user_id, status])
+  @@map("project")
+}
+
+model Task {
+  id           String       @id @default(uuid()) @db.Uuid
+  user_id      String       @map("user_id") @db.Uuid
+  project_id   String?      @map("project_id") @db.Uuid
+  title        String
+  description  String?
+  status       TaskStatus   @default(todo)
+  priority     TaskPriority @default(medium)
+  due_date     DateTime?    @map("due_date") @db.Date
+  completed_at DateTime?    @map("completed_at") @db.Timestamptz(6)
+  archived_at  DateTime?    @map("archived_at") @db.Timestamptz(6)
+  recurrence_rule_id String? @map("recurrence_rule_id") @db.Uuid
+  occurrence_date DateTime? @map("occurrence_date") @db.Date
+  rule_version Int? @map("rule_version")
+  version      Int          @default(1)
+  created_at   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at   DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user              User              @relation(fields: [user_id], references: [id])
+  project           Project?          @relation(fields: [user_id, project_id], references: [user_id, id])
+  events            TaskEvent[]
+  pomodoro_sessions PomodoroSession[]
+  timebox_entries   TimeboxEntry[]
+  recurrence_rule   TaskRecurrenceRule? @relation("TaskOccurrenceRule", fields: [user_id, recurrence_rule_id], references: [user_id, id])
+  recurrence_revision TaskRecurrenceRevision? @relation("TaskOccurrenceRevision", fields: [user_id, recurrence_rule_id, rule_version], references: [user_id, rule_id, rule_version])
+  dependency_successors TaskDependency[] @relation("TaskDependencyTask")
+  dependency_predecessors TaskDependency[] @relation("TaskDependencyPredecessor")
+
+  @@unique([user_id, id])
+  @@unique([recurrence_rule_id, occurrence_date])
+  @@index([user_id, status, due_date])
+  @@index([project_id, status])
+  @@map("task")
+}
+
+model TaskDependency {
+  user_id        String   @map("user_id") @db.Uuid
+  task_id        String   @map("task_id") @db.Uuid
+  predecessor_id String   @map("predecessor_id") @db.Uuid
+  created_at     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user        User @relation(fields: [user_id], references: [id])
+  task        Task @relation("TaskDependencyTask", fields: [user_id, task_id], references: [user_id, id])
+  predecessor Task @relation("TaskDependencyPredecessor", fields: [user_id, predecessor_id], references: [user_id, id])
+
+  @@id([task_id, predecessor_id])
+  @@index([predecessor_id])
+  @@map("task_dependency")
+}
+
+model TaskRecurrenceRule {
+  id                    String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id               String              @map("user_id") @db.Uuid
+  title                 String
+  description           String?
+  project_id            String?             @map("project_id") @db.Uuid
+  priority              TaskPriority        @default(medium)
+  frequency             RecurrenceFrequency
+  interval              Int                 @default(1)
+  start_date            DateTime            @map("start_date") @db.Date
+  end_date              DateTime?           @map("end_date") @db.Date
+  timezone              String
+  status                RecurrenceStatus    @default(active)
+  next_date             DateTime?           @map("next_date") @db.Date
+  last_generated_date   DateTime?           @map("last_generated_date") @db.Date
+  processing_updated_at DateTime?           @map("processing_updated_at") @db.Timestamptz(6)
+  version               Int                 @default(1)
+  created_at            DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at            DateTime            @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  user        User                     @relation(fields: [user_id], references: [id])
+  project     Project?                 @relation(fields: [user_id, project_id], references: [user_id, id])
+  revisions   TaskRecurrenceRevision[]
+  occurrences Task[]                   @relation("TaskOccurrenceRule")
+
+  @@unique([user_id, id])
+  @@index([status, next_date])
+  @@map("task_recurrence_rule")
+}
+
+model TaskRecurrenceRevision {
+  id              String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id         String                   @map("user_id") @db.Uuid
+  rule_id         String                   @map("rule_id") @db.Uuid
+  rule_version    Int                      @map("rule_version")
+  action          RecurrenceRevisionAction
+  snapshot        Json
+  effective_after DateTime?                @map("effective_after") @db.Date
+  changed_at      DateTime                 @default(now()) @map("changed_at") @db.Timestamptz(6)
+
+  user        User                 @relation(fields: [user_id], references: [id])
+  rule        TaskRecurrenceRule   @relation(fields: [user_id, rule_id], references: [user_id, id])
+  occurrences Task[]               @relation("TaskOccurrenceRevision")
+
+  @@unique([user_id, rule_id, rule_version])
+  @@index([rule_id, rule_version])
+  @@map("task_recurrence_revision")
+}
+
+model TaskEvent {
+  id                    String        @id @default(uuid()) @db.Uuid
+  user_id               String        @map("user_id") @db.Uuid
+  task_id               String        @map("task_id") @db.Uuid
+  task_version          Int           @map("task_version")
+  event_type            TaskEventType @map("event_type")
+  from_status           TaskStatus?   @map("from_status")
+  to_status             TaskStatus    @map("to_status")
+  previous_project_id   String?       @map("previous_project_id") @db.Uuid
+  project_id_at_event   String?       @map("project_id_at_event") @db.Uuid
+  task_title_snapshot   String        @map("task_title_snapshot")
+  project_name_snapshot String?       @map("project_name_snapshot")
+  archived              Boolean
+  occurred_at           DateTime      @default(now()) @map("occurred_at") @db.Timestamptz(6)
+
+  user             User     @relation(fields: [user_id], references: [id])
+  task             Task     @relation(fields: [user_id, task_id], references: [user_id, id])
+  project          Project? @relation("TaskEventProject", fields: [user_id, project_id_at_event], references: [user_id, id])
+  previous_project Project? @relation("TaskEventPreviousProject", fields: [user_id, previous_project_id], references: [user_id, id])
+
+  @@unique([task_id, task_version])
+  @@index([user_id, occurred_at])
+  @@index([task_id, occurred_at])
+  @@index([project_id_at_event, occurred_at])
+  @@map("task_event")
 }
 
 model AuthAccount {
@@ -65,13 +329,13 @@ model AuthAccount {
 }
 
 model AuthLinkIntent {
-  id                    String    @id @default(uuid()) @db.Uuid
-  user_id               String    @map("user_id") @db.Uuid
-  intent_hash           String    @unique @map("intent_hash")
-  session_binding_hash  String    @map("session_binding_hash")
-  expires_at            DateTime  @map("expires_at") @db.Timestamptz(6)
-  used_at               DateTime? @map("used_at") @db.Timestamptz(6)
-  created_at            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  id                   String    @id @default(uuid()) @db.Uuid
+  user_id              String    @map("user_id") @db.Uuid
+  intent_hash          String    @unique @map("intent_hash")
+  session_binding_hash String    @map("session_binding_hash")
+  expires_at           DateTime  @map("expires_at") @db.Timestamptz(6)
+  used_at              DateTime? @map("used_at") @db.Timestamptz(6)
+  created_at           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   user User @relation(fields: [user_id], references: [id])
 
@@ -140,18 +404,19 @@ model RateLimitBucket {
 }
 
 model PomodoroDay {
-  id                   String        @id @default(uuid()) @db.Uuid
-  user_id              String        @map("user_id") @db.Uuid
-  cycle_date           DateTime      @map("cycle_date") @db.Date
-  timezone             String
-  next_phase           PomodoroPhase @default(focus) @map("next_phase")
-  completed_focus_count Int          @default(0) @map("completed_focus_count")
-  version              Int           @default(1)
-  created_at           DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updated_at           DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                    String        @id @default(uuid()) @db.Uuid
+  user_id               String        @map("user_id") @db.Uuid
+  cycle_date            DateTime      @map("cycle_date") @db.Date
+  timezone              String
+  next_phase            PomodoroPhase @default(focus) @map("next_phase")
+  completed_focus_count Int           @default(0) @map("completed_focus_count")
+  version               Int           @default(1)
+  created_at            DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at            DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  user   User            @relation(fields: [user_id], references: [id])
-  states PomodoroState[] @relation("PomodoroStateDay")
+  user     User              @relation(fields: [user_id], references: [id])
+  states   PomodoroState[]   @relation("PomodoroStateDay")
+  sessions PomodoroSession[]
 
   @@unique([user_id, cycle_date])
   @@unique([user_id, id])
@@ -170,4 +435,312 @@ model PomodoroState {
   day  PomodoroDay? @relation("PomodoroStateDay", fields: [user_id, cycle_day_id], references: [user_id, id])
 
   @@map("pomodoro_state")
+}
+
+model Habit {
+  id          String    @id @default(uuid()) @db.Uuid
+  user_id     String    @map("user_id") @db.Uuid
+  name        String
+  start_date  DateTime  @map("start_date") @db.Date
+  timezone    String
+  archived_at DateTime? @map("archived_at") @db.Timestamptz(6)
+  archived_on DateTime? @map("archived_on") @db.Date
+  version     Int       @default(1)
+  created_at  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at  DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user            User            @relation(fields: [user_id], references: [id])
+  schedules       HabitSchedule[]
+  check_ins       HabitCheckIn[]
+  timebox_entries TimeboxEntry[]
+
+  @@unique([user_id, id])
+  @@index([user_id, archived_on])
+  @@map("habit")
+}
+
+model HabitSchedule {
+  id             String   @id @default(uuid()) @db.Uuid
+  user_id        String   @map("user_id") @db.Uuid
+  habit_id       String   @map("habit_id") @db.Uuid
+  effective_from DateTime @map("effective_from") @db.Date
+  weekdays       Int[]    @db.SmallInt
+  created_at     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user  User  @relation(fields: [user_id], references: [id])
+  habit Habit @relation(fields: [user_id, habit_id], references: [user_id, id])
+
+  @@unique([habit_id, effective_from])
+  @@map("habit_schedule")
+}
+
+model HabitCheckIn {
+  id         String   @id @default(uuid()) @db.Uuid
+  user_id    String   @map("user_id") @db.Uuid
+  habit_id   String   @map("habit_id") @db.Uuid
+  date       DateTime @db.Date
+  checked_at DateTime @default(now()) @map("checked_at") @db.Timestamptz(6)
+  created_at DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user  User  @relation(fields: [user_id], references: [id])
+  habit Habit @relation(fields: [user_id, habit_id], references: [user_id, id])
+
+  @@unique([habit_id, date])
+  @@index([user_id, date])
+  @@map("habit_check_in")
+}
+
+model PomodoroSession {
+  id                    String                @id @default(uuid()) @db.Uuid
+  user_id               String                @map("user_id") @db.Uuid
+  cycle_day_id          String                @map("cycle_day_id") @db.Uuid
+  phase                 PomodoroPhase
+  status                PomodoroSessionStatus
+  planned_seconds       Int                   @map("planned_seconds")
+  task_id               String?               @map("task_id") @db.Uuid
+  project_id_at_start   String?               @map("project_id_at_start") @db.Uuid
+  task_title_snapshot   String?               @map("task_title_snapshot")
+  project_name_snapshot String?               @map("project_name_snapshot")
+  started_at            DateTime              @default(now()) @map("started_at") @db.Timestamptz(6)
+  due_at                DateTime?             @map("due_at") @db.Timestamptz(6)
+  ended_at              DateTime?             @map("ended_at") @db.Timestamptz(6)
+  version               Int                   @default(1)
+  created_at            DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at            DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user      User               @relation(fields: [user_id], references: [id])
+  cycle_day PomodoroDay        @relation(fields: [user_id, cycle_day_id], references: [user_id, id])
+  task      Task?              @relation(fields: [user_id, task_id], references: [user_id, id])
+  project   Project?           @relation("PomodoroSessionProject", fields: [user_id, project_id_at_start], references: [user_id, id])
+  intervals PomodoroInterval[]
+
+  @@unique([user_id, id])
+  @@index([user_id, started_at])
+  @@index([status, due_at])
+  @@map("pomodoro_session")
+}
+
+model PomodoroInterval {
+  id         String    @id @default(uuid()) @db.Uuid
+  user_id    String    @map("user_id") @db.Uuid
+  session_id String    @map("session_id") @db.Uuid
+  started_at DateTime  @default(now()) @map("started_at") @db.Timestamptz(6)
+  ended_at   DateTime? @map("ended_at") @db.Timestamptz(6)
+
+  user    User            @relation(fields: [user_id], references: [id])
+  session PomodoroSession @relation(fields: [user_id, session_id], references: [user_id, id])
+
+  @@index([session_id, started_at])
+  @@map("pomodoro_interval")
+}
+
+model TimeboxEntry {
+  id           String        @id @default(uuid()) @db.Uuid
+  user_id      String        @map("user_id") @db.Uuid
+  kind         TimeboxKind
+  title        String
+  starts_at    DateTime      @map("starts_at") @db.Timestamptz(6)
+  ends_at      DateTime      @map("ends_at") @db.Timestamptz(6)
+  task_id      String?       @map("task_id") @db.Uuid
+  habit_id     String?       @map("habit_id") @db.Uuid
+  status       TimeboxStatus @default(planned)
+  cancelled_at DateTime?     @map("cancelled_at") @db.Timestamptz(6)
+  version      Int           @default(1)
+  created_at   DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at   DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user  User   @relation(fields: [user_id], references: [id])
+  task  Task?  @relation(fields: [user_id, task_id], references: [user_id, id])
+  habit Habit? @relation(fields: [user_id, habit_id], references: [user_id, id])
+
+  @@unique([user_id, id])
+  @@index([user_id, starts_at])
+  @@index([user_id, ends_at])
+  @@map("timebox_entry")
+}
+
+model FinanceAccount {
+  id              String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id         String             @map("user_id") @db.Uuid
+  name            String
+  type            FinanceAccountType
+  opening_balance BigInt             @default(0) @map("opening_balance")
+  archived_at     DateTime?          @map("archived_at") @db.Timestamptz(6)
+  version         Int                @default(1)
+  created_at      DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at      DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user            User                          @relation(fields: [user_id], references: [id])
+  balance_changes FinanceAccountBalanceChange[]
+  transactions    FinanceTransaction[]          @relation("FinanceTransactionSource")
+  transfers_in    FinanceTransaction[]          @relation("FinanceTransactionDestination")
+  recurrence_sources FinanceRecurrenceRule[]    @relation("FinanceRecurrenceSource")
+  recurrence_destinations FinanceRecurrenceRule[] @relation("FinanceRecurrenceDestination")
+
+  @@unique([user_id, id])
+  @@index([user_id, archived_at])
+  @@map("finance_account")
+}
+
+model FinanceAccountBalanceChange {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id          String   @map("user_id") @db.Uuid
+  account_id       String   @map("account_id") @db.Uuid
+  account_version  Int      @map("account_version")
+  previous_balance BigInt?  @map("previous_balance")
+  new_balance      BigInt   @map("new_balance")
+  changed_at       DateTime @default(now()) @map("changed_at") @db.Timestamptz(6)
+
+  user    User           @relation(fields: [user_id], references: [id])
+  account FinanceAccount @relation(fields: [user_id, account_id], references: [user_id, id])
+
+  @@unique([account_id, account_version])
+  @@index([user_id, changed_at])
+  @@map("finance_account_balance_change")
+}
+
+model FinanceCategory {
+  id          String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id     String              @map("user_id") @db.Uuid
+  name        String
+  type        FinanceCategoryType
+  archived_at DateTime?           @map("archived_at") @db.Timestamptz(6)
+  version     Int                 @default(1)
+  created_at  DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at  DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user         User                 @relation(fields: [user_id], references: [id])
+  transactions FinanceTransaction[]
+  budgets      Budget[]
+  recurrence_rules FinanceRecurrenceRule[]
+
+  @@unique([user_id, id])
+  @@index([user_id, type, archived_at])
+  @@map("finance_category")
+}
+
+model FinanceTransaction {
+  id            String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id       String                   @map("user_id") @db.Uuid
+  type          FinanceTransactionType
+  status        FinanceTransactionStatus @default(posted)
+  account_id    String                   @map("account_id") @db.Uuid
+  to_account_id String?                  @map("to_account_id") @db.Uuid
+  category_id   String?                  @map("category_id") @db.Uuid
+  amount        BigInt
+  date          DateTime                 @db.Date
+  note          String?
+  posted_at     DateTime?                @map("posted_at") @db.Timestamptz(6)
+  voided_at     DateTime?                @map("voided_at") @db.Timestamptz(6)
+  recurrence_rule_id String?             @map("recurrence_rule_id") @db.Uuid
+  occurrence_date DateTime?              @map("occurrence_date") @db.Date
+  rule_version Int?                      @map("rule_version")
+  version       Int                      @default(1)
+  created_at    DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at    DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user       User                         @relation(fields: [user_id], references: [id])
+  account    FinanceAccount               @relation("FinanceTransactionSource", fields: [user_id, account_id], references: [user_id, id])
+  to_account FinanceAccount?              @relation("FinanceTransactionDestination", fields: [user_id, to_account_id], references: [user_id, id])
+  category   FinanceCategory?             @relation(fields: [user_id, category_id], references: [user_id, id])
+  revisions  FinanceTransactionRevision[]
+  recurrence_rule FinanceRecurrenceRule? @relation("FinanceOccurrenceRule", fields: [user_id, recurrence_rule_id], references: [user_id, id])
+  recurrence_revision FinanceRecurrenceRevision? @relation("FinanceOccurrenceRevision", fields: [user_id, recurrence_rule_id, rule_version], references: [user_id, rule_id, rule_version])
+
+  @@unique([user_id, id])
+  @@unique([recurrence_rule_id, occurrence_date])
+  @@index([user_id, date, status])
+  @@index([account_id, status])
+  @@index([to_account_id, status])
+  @@map("finance_transaction")
+}
+
+model FinanceRecurrenceRule {
+  id                    String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id               String              @map("user_id") @db.Uuid
+  type                  FinanceTransactionType
+  account_id            String              @map("account_id") @db.Uuid
+  to_account_id         String?             @map("to_account_id") @db.Uuid
+  category_id           String?             @map("category_id") @db.Uuid
+  amount                BigInt
+  note                  String?
+  frequency             RecurrenceFrequency
+  interval              Int                 @default(1)
+  start_date            DateTime            @map("start_date") @db.Date
+  end_date              DateTime?           @map("end_date") @db.Date
+  timezone              String
+  status                RecurrenceStatus    @default(active)
+  next_date             DateTime?           @map("next_date") @db.Date
+  last_generated_date   DateTime?           @map("last_generated_date") @db.Date
+  processing_updated_at DateTime?           @map("processing_updated_at") @db.Timestamptz(6)
+  version               Int                 @default(1)
+  created_at            DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at            DateTime            @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  user        User                       @relation(fields: [user_id], references: [id])
+  account     FinanceAccount             @relation("FinanceRecurrenceSource", fields: [user_id, account_id], references: [user_id, id])
+  to_account  FinanceAccount?            @relation("FinanceRecurrenceDestination", fields: [user_id, to_account_id], references: [user_id, id])
+  category    FinanceCategory?           @relation(fields: [user_id, category_id], references: [user_id, id])
+  revisions   FinanceRecurrenceRevision[]
+  occurrences FinanceTransaction[]       @relation("FinanceOccurrenceRule")
+
+  @@unique([user_id, id])
+  @@index([status, next_date])
+  @@map("finance_recurrence_rule")
+}
+
+model FinanceRecurrenceRevision {
+  id              String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id         String                   @map("user_id") @db.Uuid
+  rule_id         String                   @map("rule_id") @db.Uuid
+  rule_version    Int                      @map("rule_version")
+  action          RecurrenceRevisionAction
+  snapshot        Json
+  effective_after DateTime?                @map("effective_after") @db.Date
+  changed_at      DateTime                 @default(now()) @map("changed_at") @db.Timestamptz(6)
+
+  user        User                    @relation(fields: [user_id], references: [id])
+  rule        FinanceRecurrenceRule   @relation(fields: [user_id, rule_id], references: [user_id, id])
+  occurrences FinanceTransaction[]    @relation("FinanceOccurrenceRevision")
+
+  @@unique([user_id, rule_id, rule_version])
+  @@index([rule_id, rule_version])
+  @@map("finance_recurrence_revision")
+}
+
+model FinanceTransactionRevision {
+  id                  String                           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id             String                           @map("user_id") @db.Uuid
+  transaction_id      String                           @map("transaction_id") @db.Uuid
+  transaction_version Int                              @map("transaction_version")
+  action              FinanceTransactionRevisionAction
+  snapshot            Json
+  changed_at          DateTime                         @default(now()) @map("changed_at") @db.Timestamptz(6)
+
+  user        User               @relation(fields: [user_id], references: [id])
+  transaction FinanceTransaction @relation(fields: [user_id, transaction_id], references: [user_id, id])
+
+  @@unique([transaction_id, transaction_version], map: "finance_transaction_revision_transaction_id_transaction_version")
+  @@index([user_id, changed_at])
+  @@index([transaction_id, transaction_version], map: "finance_revision_transaction_version_idx")
+  @@map("finance_transaction_revision")
+}
+
+model Budget {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id      String   @map("user_id") @db.Uuid
+  category_id  String   @map("category_id") @db.Uuid
+  month        DateTime @db.Date
+  limit_amount BigInt   @map("limit_amount")
+  version      Int      @default(1)
+  created_at   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user     User            @relation(fields: [user_id], references: [id])
+  category FinanceCategory @relation(fields: [user_id, category_id], references: [user_id, id])
+
+  @@unique([user_id, id])
+  @@unique([user_id, category_id, month])
+  @@index([user_id, month])
+  @@map("budget")
 }
