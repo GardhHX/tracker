@@ -4,6 +4,7 @@ import test from "node:test";
 import { createApp } from "./app.js";
 import { createInMemoryAuthRepo } from "./modules/auth/repo.inmemory.js";
 import type { M1Service, ProjectDto, TaskDto } from "./modules/work/types.js";
+import type { M5Service } from "./modules/m5/types.js";
 
 function testSecurity() {
   return {
@@ -51,6 +52,38 @@ function updateCookies(jar: string, response: Response) {
   }
   return [...next].map(([name, value]) => `${name}=${value}`).join("; ");
 }
+
+test("health and readiness probes distinguish liveness from an unavailable dependency", async (t) => {
+  const app = createApp({
+    repo: createInMemoryAuthRepo().repo,
+    security: testSecurity(),
+    allowedOrigins: [],
+    readinessCheck: async () => {},
+  });
+  const server = createServer(app);
+  const base = await start(server);
+  t.after(() => server.close());
+
+  let response = await fetch(`${base}/api/v1/healthz`);
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { data: { status: "ok" } });
+
+  response = await fetch(`${base}/api/v1/readyz`);
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { data: { status: "ready" } });
+
+  const unavailable = createServer(createApp({
+    repo: createInMemoryAuthRepo().repo,
+    security: testSecurity(),
+    allowedOrigins: [],
+    readinessCheck: async () => { throw new Error("database unavailable"); },
+  }));
+  const unavailableBase = await start(unavailable);
+  t.after(() => unavailable.close());
+  response = await fetch(`${unavailableBase}/api/v1/readyz`);
+  assert.equal(response.status, 503);
+  assert.equal((await response.json() as { error: { code: string } }).error.code, "SERVICE_UNAVAILABLE");
+});
 
 test("allowed browser origins receive credentialed CORS headers", async (t) => {
   const app = createApp({
@@ -440,4 +473,36 @@ test("M1 HTTP routes require verified sessions, validate input, and forward idem
   response = await fetch(`${base}/api/v1/tasks`, { headers: { cookie: `tracker_session=${unverified.id}:1` } });
   assert.equal(response.status, 403);
   assert.equal((await response.json() as { error: { code: string } }).error.code, "EMAIL_UNVERIFIED");
+});
+
+test("M5 report routes return module data and CSV attachments", async (t) => {
+  const store = createInMemoryAuthRepo();
+  const verified = await store.repo.createUserWithState({ name: "Verified", email: "reports@example.com", passwordHash: "hash", emailVerifiedAt: new Date() });
+  const m1 = new Proxy({}, { get: () => async () => { throw new Error("unexpected M1 service call"); } }) as M1Service;
+  const m5: M5Service = {
+    async taskSummary() { return { range: { from: "2026-09-01", to: "2026-09-22", timezone: "Asia/Jakarta" }, tasks: { completed_count: 2, distinct_task_count: 1, per_project: [] } }; },
+    async projectSummary() { throw new Error("unexpected project report call"); },
+    async habitSummary() { throw new Error("unexpected habit report call"); },
+    async pomodoroSummary() { throw new Error("unexpected Pomodoro report call"); },
+    async financeSummary() { throw new Error("unexpected finance report call"); },
+    async exportTasks() { return { filename: "tasks-2026-09-01-2026-09-22.csv", body: "event_id\r\nevent-1\r\n" }; },
+    async exportProject() { throw new Error("unexpected project export call"); },
+    async exportHabits() { throw new Error("unexpected habit export call"); },
+    async exportPomodoro() { throw new Error("unexpected Pomodoro export call"); },
+    async exportFinance() { throw new Error("unexpected finance export call"); },
+  };
+  const server = createServer(createApp({ repo: store.repo, security: testSecurity(), allowedOrigins: [], m1, m5 }));
+  const base = await start(server);
+  t.after(() => server.close());
+  const cookie = `tracker_session=${verified.id}:1`;
+
+  let response = await fetch(`${base}/api/v1/tasks/reports/summary?from=2026-09-01&to=2026-09-22`, { headers: { cookie } });
+  assert.equal(response.status, 200);
+  assert.equal((await response.json() as { data: { tasks: { completed_count: number } } }).data.tasks.completed_count, 2);
+
+  response = await fetch(`${base}/api/v1/tasks/reports/export?from=2026-09-01&to=2026-09-22`, { headers: { cookie } });
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /text\/csv/);
+  assert.match(response.headers.get("content-disposition") ?? "", /attachment/);
+  assert.equal(await response.text(), "event_id\r\nevent-1\r\n");
 });

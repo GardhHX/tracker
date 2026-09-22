@@ -16,7 +16,10 @@ export interface EmailSender {
   send(message: ClaimedEmail): Promise<void>;
 }
 
-export type EmailWorkerLogger = Pick<Console, "info" | "error">;
+export type EmailWorkerLogger = {
+  info(event: string, fields: { id: string; template: string; attempts: number }): void;
+  error(event: string, fields: { id: string; template: string; attempts: number }): void;
+};
 
 export type EmailWorkerOptions = {
   batchSize: number;
@@ -34,7 +37,7 @@ export function retryDelayMs(attempts: number, baseMs = 30_000, maxMs = 60 * 60 
 
 export function createEmailOutboxProcessor(store: EmailOutboxStore, sender: EmailSender, options: EmailWorkerOptions) {
   const now = options.now ?? (() => new Date());
-  const logger = options.logger ?? console;
+  const logger = options.logger;
 
   return {
     async processBatch() {
@@ -50,20 +53,17 @@ export function createEmailOutboxProcessor(store: EmailOutboxStore, sender: Emai
           await sender.send(message);
           const stored = await store.markSent({ id: message.id, attempts: message.attempts });
           if (stored) {
-            logger.info(`[tracker-email-worker] sent id=${message.id} template=${message.template} attempt=${message.attempts}`);
+            logger?.info("email_sent", { id: message.id, template: message.template, attempts: message.attempts });
           } else {
-            logger.error(`[tracker-email-worker] lease-lost id=${message.id} template=${message.template} attempt=${message.attempts}`);
+            logger?.error("email_lease_lost", { id: message.id, template: message.template, attempts: message.attempts });
           }
-        } catch (error) {
+        } catch {
           const terminal = message.attempts >= options.maxAttempts;
           const retryAt = new Date(
             now().getTime() + retryDelayMs(message.attempts, options.retryBaseMs, options.retryMaxMs),
           );
           await store.markFailed({ id: message.id, attempts: message.attempts, retryAt, terminal });
-          const detail = error instanceof Error ? error.message : String(error);
-          logger.error(
-            `[tracker-email-worker] ${terminal ? "failed" : "retry"} id=${message.id} template=${message.template} attempt=${message.attempts}: ${detail}`,
-          );
+          logger?.error(terminal ? "email_delivery_failed" : "email_delivery_retry", { id: message.id, template: message.template, attempts: message.attempts });
         }
       }
 

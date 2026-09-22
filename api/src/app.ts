@@ -2,7 +2,8 @@ import express, { type Express, type NextFunction, type Request, type Response }
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import { meDto } from "./lib/dto.js";
-import { asyncRoute, error, requestId } from "./lib/http.js";
+import { asyncRoute, error, requestId, requestLogger } from "./lib/http.js";
+import { logError } from "./lib/observability.js";
 import { createInMemoryRateLimiter, type RateLimiter } from "./lib/ratelimit.js";
 import { IdempotencyConflictError, IdempotencyKeyError } from "./lib/idempotency.js";
 import { loginSchema, normalizeEmail, registerSchema, resetPasswordSchema, tokenSchema, emailSchema, updateProfileSchema, passwordSetupConfirmSchema } from "./lib/validation.js";
@@ -17,6 +18,11 @@ import { createHabitSchema, dateParamSchema, habitScheduleSchema, patchHabitSche
 import type { CategoryType, M3Service, TransactionStatus, TransactionType } from "./modules/finance/types.js";
 import { FinanceError } from "./modules/finance/types.js";
 import { createAccountSchema, createBudgetSchema, createCategorySchema, createTransactionSchema, financeVersionSchema, patchAccountSchema, patchBudgetSchema, patchCategorySchema, patchTransactionSchema } from "./modules/finance/validation.js";
+import type { M4Service, RecurrenceStatus } from "./modules/m4/types.js";
+import { M4Error } from "./modules/m4/types.js";
+import { createFinanceRuleSchema, createTaskRuleSchema, m4VersionSchema, patchFinanceRuleSchema, patchTaskRuleSchema } from "./modules/m4/validation.js";
+import type { M5Service } from "./modules/m5/types.js";
+import { M5Error } from "./modules/m5/types.js";
 
 const SESSION_COOKIE = "tracker_session";
 const REAUTH_WINDOW_SECONDS = 10 * 60;
@@ -46,6 +52,9 @@ export type AppDeps = {
   m1?: M1Service;
   m2?: M2Service;
   m3?: M3Service;
+  m4?: M4Service;
+  m5?: M5Service;
+  readinessCheck?: () => Promise<void>;
 };
 
 type RequestWithUser = Request & { user?: AuthUser };
@@ -59,6 +68,7 @@ export function createApp(deps: AppDeps): Express {
   app.use(helmet());
   app.use(cookieParser());
   app.use(requestId);
+  app.use(requestLogger);
   app.use(express.json({ limit: "32kb" }));
   app.use((_req, res, next) => {
     res.setHeader("Cache-Control", "private, no-store");
@@ -77,6 +87,20 @@ export function createApp(deps: AppDeps): Express {
     if (req.method === "OPTIONS") return res.sendStatus(204);
     next();
   });
+
+  app.get("/api/v1/healthz", (_req, res) => {
+    res.json({ data: { status: "ok" } });
+  });
+
+  app.get("/api/v1/readyz", asyncRoute(async (_req, res) => {
+    try {
+      await deps.readinessCheck?.();
+      res.json({ data: { status: "ready" } });
+    } catch (cause) {
+      logError("readiness_check_failed", cause, { request_id: res.locals.requestId });
+      error(res, 503, "SERVICE_UNAVAILABLE", "The service is not ready.");
+    }
+  }));
   app.use((req, res, next) => {
     if (["GET", "HEAD", "OPTIONS"].includes(req.method) || req.path === "/api/v1/auth/csrf") return next();
     if (!deps.security.verifyCsrf(req.get("x-csrf-token"), req.cookies?.tracker_csrf)) {
@@ -333,6 +357,63 @@ export function createApp(deps: AppDeps): Express {
     };
     const verified = [requireUser, requireVerifiedBusiness, enforceBusinessRateLimit];
 
+    if (deps.m5) {
+      const m5 = deps.m5;
+      const reportInput = (req: Request) => ({ from: one(req, "from"), to: one(req, "to") });
+      const sendExport = (res: Response, value: { filename: string; body: string }) => {
+        res.setHeader("Content-Disposition", `attachment; filename=\"${value.filename}\"`);
+        res.type("text/csv; charset=utf-8").send(value.body);
+      };
+      const reconcilePomodoro = async () => {
+        if (deps.m2) await deps.m2.reconcileDueSessions();
+      };
+      const projectExportSection = (req: Request) => {
+        const section = one(req, "section");
+        if (section !== "tasks" && section !== "pomodoro") throw new M5Error(422, "INVALID_QUERY", "section must be tasks or pomodoro.");
+        return section;
+      };
+      const financeExportSection = (req: Request) => {
+        const section = one(req, "section");
+        if (section !== "finance" && section !== "budgets") throw new M5Error(422, "INVALID_QUERY", "section must be finance or budgets.");
+        return section;
+      };
+
+      app.get("/api/v1/tasks/reports/summary", ...verified, asyncRoute(async (req, res) => {
+        res.json({ data: await m5.taskSummary(userId(req), reportInput(req)) });
+      }));
+      app.get("/api/v1/tasks/reports/export", ...verified, asyncRoute(async (req, res) => {
+        sendExport(res, await m5.exportTasks(userId(req), reportInput(req)));
+      }));
+      app.get("/api/v1/projects/:id/reports/summary", ...verified, asyncRoute(async (req, res) => {
+        await reconcilePomodoro();
+        res.json({ data: await m5.projectSummary(userId(req), param(req, "id"), reportInput(req)) });
+      }));
+      app.get("/api/v1/projects/:id/reports/export", ...verified, asyncRoute(async (req, res) => {
+        await reconcilePomodoro();
+        sendExport(res, await m5.exportProject(userId(req), param(req, "id"), projectExportSection(req), reportInput(req)));
+      }));
+      app.get("/api/v1/habits/reports/summary", ...verified, asyncRoute(async (req, res) => {
+        res.json({ data: await m5.habitSummary(userId(req), reportInput(req)) });
+      }));
+      app.get("/api/v1/habits/reports/export", ...verified, asyncRoute(async (req, res) => {
+        sendExport(res, await m5.exportHabits(userId(req), reportInput(req)));
+      }));
+      app.get("/api/v1/pomodoro/reports/summary", ...verified, asyncRoute(async (req, res) => {
+        await reconcilePomodoro();
+        res.json({ data: await m5.pomodoroSummary(userId(req), reportInput(req)) });
+      }));
+      app.get("/api/v1/pomodoro/reports/export", ...verified, asyncRoute(async (req, res) => {
+        await reconcilePomodoro();
+        sendExport(res, await m5.exportPomodoro(userId(req), reportInput(req)));
+      }));
+      app.get("/api/v1/finance/reports/summary", ...verified, asyncRoute(async (req, res) => {
+        res.json({ data: await m5.financeSummary(userId(req), reportInput(req)) });
+      }));
+      app.get("/api/v1/finance/reports/export", ...verified, asyncRoute(async (req, res) => {
+        sendExport(res, await m5.exportFinance(userId(req), financeExportSection(req), reportInput(req)));
+      }));
+    }
+
     app.get("/api/v1/projects", ...verified, asyncRoute(async (req, res) => {
       const status = one(req, "status") ?? "active";
       if (!(["active", "completed", "archived", "all"] as string[]).includes(status)) throw new WorkError(422, "INVALID_QUERY", "Invalid project status filter.");
@@ -376,6 +457,43 @@ export function createApp(deps: AppDeps): Express {
       if (result.replayed) res.setHeader("Idempotency-Replayed", "true");
       res.status(result.status).json({ data: result.data });
     }));
+    if (deps.m4) {
+      const m4 = deps.m4;
+      const recurrenceStatus = (req: Request) => {
+        const status = one(req, "status") ?? "active";
+        if (!( ["active", "stopped", "expired", "all"] as string[]).includes(status)) throw new M4Error(422, "INVALID_QUERY", "Invalid recurrence status filter.");
+        return status as RecurrenceStatus | "all";
+      };
+      const occurrenceRange = (req: Request) => {
+        const from = one(req, "from");
+        const to = one(req, "to");
+        if ((from && !to) || (!from && to)) throw new M4Error(422, "INVALID_QUERY", "from and to must be a valid date pair.");
+        const today = new Date().toISOString().slice(0, 10);
+        const range = from && to ? { from, to } : { from: `${today.slice(0, 7)}-01`, to: today };
+        if (!validDate(range.from) || !validDate(range.to) || range.from > range.to) throw new M4Error(422, "INVALID_QUERY", "from and to must be a valid date pair.");
+        if ((new Date(`${range.to}T00:00:00.000Z`).getTime() - new Date(`${range.from}T00:00:00.000Z`).getTime()) / 86_400_000 >= 366) throw new M4Error(422, "RANGE_TOO_LARGE", "Date range cannot exceed 366 days.");
+        return range;
+      };
+      const sendM4Idempotent = (res: Response, result: { status: number; replayed: boolean; data: unknown }) => {
+        if (result.replayed) res.setHeader("Idempotency-Replayed", "true");
+        res.status(result.status).json({ data: result.data });
+      };
+
+      app.get("/api/v1/tasks/recurrences", ...verified, asyncRoute(async (req, res) => {
+        const paging = page(req); res.json(await m4.listTaskRules(userId(req), recurrenceStatus(req), paging.page, paging.pageSize));
+      }));
+      app.post("/api/v1/tasks/recurrences", ...verified, body(createTaskRuleSchema), asyncRoute(async (req, res) => sendM4Idempotent(res, await m4.createTaskRule(userId(req), req.body, req.get("idempotency-key") ?? ""))));
+      app.get("/api/v1/tasks/recurrences/:id/occurrences", ...verified, asyncRoute(async (req, res) => {
+        const range = occurrenceRange(req); const paging = page(req);
+        res.json(await m4.listTaskOccurrences(userId(req), param(req, "id"), range.from, range.to, paging.page, paging.pageSize));
+      }));
+      app.get("/api/v1/tasks/recurrences/:id/revisions", ...verified, asyncRoute(async (req, res) => {
+        const paging = page(req); res.json(await m4.listTaskRuleRevisions(userId(req), param(req, "id"), paging.page, paging.pageSize));
+      }));
+      app.get("/api/v1/tasks/recurrences/:id", ...verified, asyncRoute(async (req, res) => res.json({ data: await m4.getTaskRule(userId(req), param(req, "id")) })));
+      app.patch("/api/v1/tasks/recurrences/:id", ...verified, body(patchTaskRuleSchema), asyncRoute(async (req, res) => res.json({ data: await m4.patchTaskRule(userId(req), param(req, "id"), req.body) })));
+      app.post("/api/v1/tasks/recurrences/:id/stop", ...verified, body(m4VersionSchema), asyncRoute(async (req, res) => res.json({ data: await m4.stopTaskRule(userId(req), param(req, "id"), req.body.version) })));
+    }
     app.get("/api/v1/tasks/:id", ...verified, asyncRoute(async (req, res) => res.json({ data: await m1.getTask(userId(req), param(req, "id")) })));
     app.patch("/api/v1/tasks/:id", ...verified, body(patchTaskSchema), asyncRoute(async (req, res) => res.json({ data: await m1.patchTask(userId(req), param(req, "id"), req.body) })));
     app.delete("/api/v1/tasks/:id", ...verified, asyncRoute(async (req, res) => {
@@ -391,6 +509,16 @@ export function createApp(deps: AppDeps): Express {
       if ((from && !to) || (!from && to) || (from && to && (from > to || !validDate(from) || !validDate(to)))) throw new WorkError(422, "INVALID_QUERY", "from and to must be a valid date pair.");
       res.json(await m1.listTaskEvents(userId(req), param(req, "id"), { from, to, ...page(req) }));
     }));
+    if (deps.m4) {
+      const m4 = deps.m4;
+      app.get("/api/v1/tasks/:id/dependencies", ...verified, asyncRoute(async (req, res) => {
+        const paging = page(req); res.json(await m4.listDependencies(userId(req), param(req, "id"), paging.page, paging.pageSize));
+      }));
+      app.put("/api/v1/tasks/:id/dependencies/:predecessor_id", ...verified, asyncRoute(async (req, res) => res.json({ data: await m4.setDependency(userId(req), param(req, "id"), param(req, "predecessor_id")) })));
+      app.delete("/api/v1/tasks/:id/dependencies/:predecessor_id", ...verified, asyncRoute(async (req, res) => {
+        await m4.deleteDependency(userId(req), param(req, "id"), param(req, "predecessor_id")); res.status(204).end();
+      }));
+    }
 
     if (deps.m2) {
       const m2 = deps.m2;
@@ -515,6 +643,42 @@ export function createApp(deps: AppDeps): Express {
       app.patch("/api/v1/finance/budgets/:id", ...verified, body(patchBudgetSchema), asyncRoute(async (req, res) => res.json({ data: await m3.patchBudget(userId(req), param(req, "id"), req.body) })));
       app.delete("/api/v1/finance/budgets/:id", ...verified, asyncRoute(async (req, res) => { await m3.deleteBudget(userId(req), param(req, "id"), ifMatchVersion(req)); res.status(204).end(); }));
     }
+
+    if (deps.m4) {
+      const m4 = deps.m4;
+      const recurrenceStatus = (req: Request) => {
+        const status = one(req, "status") ?? "active";
+        if (!( ["active", "stopped", "expired", "all"] as string[]).includes(status)) throw new M4Error(422, "INVALID_QUERY", "Invalid recurrence status filter.");
+        return status as RecurrenceStatus | "all";
+      };
+      const occurrenceRange = (req: Request) => {
+        const from = one(req, "from"); const to = one(req, "to");
+        if ((from && !to) || (!from && to)) throw new M4Error(422, "INVALID_QUERY", "from and to must be a valid date pair.");
+        const today = new Date().toISOString().slice(0, 10);
+        const range = from && to ? { from, to } : { from: `${today.slice(0, 7)}-01`, to: today };
+        if (!validDate(range.from) || !validDate(range.to) || range.from > range.to) throw new M4Error(422, "INVALID_QUERY", "from and to must be a valid date pair.");
+        if ((new Date(`${range.to}T00:00:00.000Z`).getTime() - new Date(`${range.from}T00:00:00.000Z`).getTime()) / 86_400_000 >= 366) throw new M4Error(422, "RANGE_TOO_LARGE", "Date range cannot exceed 366 days.");
+        return range;
+      };
+      const sendM4Idempotent = (res: Response, result: { status: number; replayed: boolean; data: unknown }) => {
+        if (result.replayed) res.setHeader("Idempotency-Replayed", "true");
+        res.status(result.status).json({ data: result.data });
+      };
+      app.get("/api/v1/finance/recurrences", ...verified, asyncRoute(async (req, res) => {
+        const paging = page(req); res.json(await m4.listFinanceRules(userId(req), recurrenceStatus(req), paging.page, paging.pageSize));
+      }));
+      app.post("/api/v1/finance/recurrences", ...verified, body(createFinanceRuleSchema), asyncRoute(async (req, res) => sendM4Idempotent(res, await m4.createFinanceRule(userId(req), req.body, req.get("idempotency-key") ?? ""))));
+      app.get("/api/v1/finance/recurrences/:id/occurrences", ...verified, asyncRoute(async (req, res) => {
+        const range = occurrenceRange(req); const paging = page(req);
+        res.json(await m4.listFinanceOccurrences(userId(req), param(req, "id"), range.from, range.to, paging.page, paging.pageSize));
+      }));
+      app.get("/api/v1/finance/recurrences/:id/revisions", ...verified, asyncRoute(async (req, res) => {
+        const paging = page(req); res.json(await m4.listFinanceRuleRevisions(userId(req), param(req, "id"), paging.page, paging.pageSize));
+      }));
+      app.get("/api/v1/finance/recurrences/:id", ...verified, asyncRoute(async (req, res) => res.json({ data: await m4.getFinanceRule(userId(req), param(req, "id")) })));
+      app.patch("/api/v1/finance/recurrences/:id", ...verified, body(patchFinanceRuleSchema), asyncRoute(async (req, res) => res.json({ data: await m4.patchFinanceRule(userId(req), param(req, "id"), req.body) })));
+      app.post("/api/v1/finance/recurrences/:id/stop", ...verified, body(m4VersionSchema), asyncRoute(async (req, res) => res.json({ data: await m4.stopFinanceRule(userId(req), param(req, "id"), req.body.version) })));
+    }
   }
 
   app.use((_req, res) => error(res, 404, "NOT_FOUND", "Resource not found."));
@@ -524,10 +688,12 @@ export function createApp(deps: AppDeps): Express {
     if (err instanceof IdempotencyConflictError) return error(res, 409, err.code, err.message);
     if (err instanceof WorkError) return error(res, err.status, err.code, err.message, err.fields);
     if (err instanceof FinanceError) return error(res, err.status, err.code, err.message);
+    if (err instanceof M4Error) return error(res, err.status, err.code, err.message);
+    if (err instanceof M5Error) return error(res, err.status, err.code, err.message);
     if (err instanceof AuthError) return error(res, 401, "UNAUTHENTICATED", err.message);
     if (err instanceof ValidationError) return error(res, 422, "VALIDATION_ERROR", err.message);
     if (err instanceof ConflictError) return error(res, 409, "VERSION_CONFLICT", err.message);
-    console.error("[tracker-api] unhandled error", err);
+    logError("unhandled_error", err, { request_id: res.locals.requestId });
     return error(res, 500, "INTERNAL_ERROR", "An internal error occurred.");
   });
 

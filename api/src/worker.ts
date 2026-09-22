@@ -7,6 +7,8 @@ import { createEmailOutboxProcessor } from "./modules/email/outbox.js";
 import { createPrismaEmailOutboxStore } from "./modules/email/outbox.prisma.js";
 import { cleanupExpiredSecurityData } from "./lib/maintenance.js";
 import { createPrismaM2Service } from "./modules/m2/service.prisma.js";
+import { createPrismaM4Service } from "./modules/m4/service.prisma.js";
+import { logError, logErrorEvent, logInfo } from "./lib/observability.js";
 
 const controller = new AbortController();
 if (env.nodeEnv === "production" && !env.smtpHost) {
@@ -28,41 +30,69 @@ const processor = createEmailOutboxProcessor(
     batchSize: env.emailWorkerBatchSize,
     lockMs: env.emailWorkerLockMs,
     maxAttempts: env.emailWorkerMaxAttempts,
+    logger: { info: logInfo, error: logErrorEvent },
   },
 );
 const m2 = createPrismaM2Service(prisma);
+const m4 = createPrismaM4Service(prisma);
 
 async function run() {
-  console.info(`[tracker-email-worker] started mode=${transport ? "smtp" : "console-sink"}`);
+  logInfo("worker_started", { email_transport: transport ? "smtp" : "console_sink", environment: env.nodeEnv });
   let nextMaintenanceAt = 0;
+  let nextRecurrenceAt = 0;
+  let nextHeartbeatAt = 0;
   while (!controller.signal.aborted) {
     let count = 0;
+    let reconciled = 0;
+    let generatedTasks = 0;
+    let generatedFinance = 0;
     try {
       count = await processor.processBatch();
     } catch (error) {
-      console.error("[tracker-email-worker] batch failed", error);
+      logError("email_batch_failed", error);
     }
 
     try {
-      const reconciled = await m2.reconcileDueSessions();
-      if (reconciled > 0) console.info(`[tracker-email-worker] reconciled_pomodoro_users=${reconciled}`);
+      reconciled = await m2.reconcileDueSessions();
+      if (reconciled > 0) logInfo("pomodoro_reconciled", { users: reconciled });
     } catch (error) {
-      console.error("[tracker-email-worker] Pomodoro reconciliation failed", error);
+      logError("pomodoro_reconciliation_failed", error);
     }
 
     const current = Date.now();
+    if (current >= nextRecurrenceAt) {
+      try {
+        const generated = await m4.processDueRules();
+        generatedTasks = generated.taskOccurrences;
+        generatedFinance = generated.financeOccurrences;
+        if (generated.taskOccurrences > 0 || generated.financeOccurrences > 0) {
+          logInfo("recurrences_generated", { task_occurrences: generated.taskOccurrences, finance_occurrences: generated.financeOccurrences });
+        }
+      } catch (error) {
+        logError("recurrence_processing_failed", error);
+      }
+      nextRecurrenceAt = current + 60 * 1000;
+    }
     if (current >= nextMaintenanceAt) {
       try {
         const removed = await cleanupExpiredSecurityData(prisma, new Date(current));
         if (removed.idempotencyRecords > 0 || removed.rateLimitBuckets > 0) {
-          console.info(
-            `[tracker-email-worker] cleanup idempotency=${removed.idempotencyRecords} rate_limits=${removed.rateLimitBuckets}`,
-          );
+          logInfo("security_data_cleaned", { idempotency_records: removed.idempotencyRecords, rate_limit_buckets: removed.rateLimitBuckets });
         }
       } catch (error) {
-        console.error("[tracker-email-worker] cleanup failed", error);
+        logError("security_data_cleanup_failed", error);
       }
       nextMaintenanceAt = current + 60 * 60 * 1000;
+    }
+
+    if (current >= nextHeartbeatAt) {
+      logInfo("worker_heartbeat", {
+        email_processed: count,
+        pomodoro_users_reconciled: reconciled,
+        task_occurrences: generatedTasks,
+        finance_occurrences: generatedFinance,
+      });
+      nextHeartbeatAt = current + 60 * 1000;
     }
 
     if (count >= env.emailWorkerBatchSize) continue;
@@ -84,5 +114,5 @@ try {
 } finally {
   transport?.close();
   await prisma.$disconnect();
-  console.info("[tracker-email-worker] stopped");
+  logInfo("worker_stopped", {});
 }

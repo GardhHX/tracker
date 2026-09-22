@@ -10,6 +10,9 @@ import { WorkError } from "../modules/work/types.js";
 import { createPrismaM2Service } from "../modules/m2/service.prisma.js";
 import { createPrismaM3Service } from "../modules/finance/service.prisma.js";
 import { FinanceError } from "../modules/finance/types.js";
+import { createPrismaM4Service } from "../modules/m4/service.prisma.js";
+import { M4Error } from "../modules/m4/types.js";
+import { createPrismaM5Service } from "../modules/m5/service.prisma.js";
 
 const postgresTest = process.env.RUN_POSTGRES_INTEGRATION === "1" ? test : test.skip;
 
@@ -23,8 +26,11 @@ postgresTest("PostgreSQL persistence primitives are atomic and replay-safe", asy
   t.after(async () => {
     await prisma.rateLimitBucket.deleteMany({ where: { bucket_hash: rateHash } });
     if (userId) {
+      await prisma.taskDependency.deleteMany({ where: { user_id: userId } });
       await prisma.financeTransactionRevision.deleteMany({ where: { user_id: userId } });
       await prisma.financeTransaction.deleteMany({ where: { user_id: userId } });
+      await prisma.financeRecurrenceRevision.deleteMany({ where: { user_id: userId } });
+      await prisma.financeRecurrenceRule.deleteMany({ where: { user_id: userId } });
       await prisma.budget.deleteMany({ where: { user_id: userId } });
       await prisma.financeAccountBalanceChange.deleteMany({ where: { user_id: userId } });
       await prisma.financeCategory.deleteMany({ where: { user_id: userId } });
@@ -39,6 +45,8 @@ postgresTest("PostgreSQL persistence primitives are atomic and replay-safe", asy
       await prisma.pomodoroDay.deleteMany({ where: { user_id: userId } });
       await prisma.taskEvent.deleteMany({ where: { user_id: userId } });
       await prisma.task.deleteMany({ where: { user_id: userId } });
+      await prisma.taskRecurrenceRevision.deleteMany({ where: { user_id: userId } });
+      await prisma.taskRecurrenceRule.deleteMany({ where: { user_id: userId } });
       await prisma.project.deleteMany({ where: { user_id: userId } });
       await prisma.idempotencyRecord.deleteMany({ where: { user_id: userId } });
       await prisma.user.deleteMany({ where: { id: userId } });
@@ -369,5 +377,102 @@ postgresTest("PostgreSQL persistence primitives are atomic and replay-safe", asy
     } finally {
       await prisma.user.delete({ where: { id: other.id } });
     }
+  });
+
+  await t.test("M4 creates versioned occurrences and enforces task dependency integrity", async () => {
+    assert.ok(userId);
+    const current = new Date("2026-09-21T06:00:00.000Z");
+    const m1 = createPrismaM1Service(prisma, { now: () => current });
+    const m3 = createPrismaM3Service(prisma, { now: () => current });
+    const m4 = createPrismaM4Service(prisma, { now: () => current });
+
+    const project = await m1.createProject(userId, { name: "M4 project" }, `m4-project-${randomUUID()}`);
+    const taskRule = await m4.createTaskRule(userId, {
+      title: "Weekly planning", project_id: project.data.id, priority: "high", frequency: "daily", start_date: "2026-09-20",
+    }, `m4-task-rule-${randomUUID()}`);
+    assert.equal(taskRule.data.version, 1);
+    assert.equal((await m4.processDueRules()).taskOccurrences, 2);
+    const taskOccurrences = await m4.listTaskOccurrences(userId, taskRule.data.id, "2026-09-01", "2026-09-30", 1, 25);
+    assert.deepEqual(taskOccurrences.data.map((task) => task.occurrence_date), ["2026-09-20", "2026-09-21"]);
+    assert.deepEqual(taskOccurrences.data.map((task) => task.rule_version), [1, 1]);
+
+    const editedRule = await m4.patchTaskRule(userId, taskRule.data.id, { version: taskRule.data.version, title: "Weekly planning revised", frequency: "weekly" });
+    assert.equal(editedRule.version, 2);
+    assert.equal(editedRule.next_date, "2026-09-27");
+    assert.deepEqual((await m4.listTaskRuleRevisions(userId, taskRule.data.id, 1, 25)).data.map((revision) => revision.action), ["created", "edited"]);
+
+    const predecessor = await m1.createTask(userId, { title: "Write outline", project_id: project.data.id }, `m4-predecessor-${randomUUID()}`);
+    const successor = await m1.createTask(userId, { title: "Submit draft", project_id: project.data.id }, `m4-successor-${randomUUID()}`);
+    await m4.setDependency(userId, successor.data.id, predecessor.data.id);
+    await assert.rejects(
+      m1.setTaskStatus(userId, successor.data.id, { version: successor.data.version, status: "done" }),
+      (error: unknown) => error instanceof WorkError && error.code === "TASK_BLOCKED",
+    );
+    const donePredecessor = await m1.setTaskStatus(userId, predecessor.data.id, { version: predecessor.data.version, status: "done" });
+    const doneSuccessor = await m1.setTaskStatus(userId, successor.data.id, { version: successor.data.version, status: "done" });
+    await assert.rejects(
+      m1.setTaskStatus(userId, donePredecessor.id, { version: donePredecessor.version, status: "todo" }),
+      (error: unknown) => error instanceof WorkError && error.code === "TASK_BLOCKED",
+    );
+    await assert.rejects(
+      m4.setDependency(userId, predecessor.data.id, doneSuccessor.id),
+      (error: unknown) => error instanceof M4Error && error.code === "DEPENDENCY_CYCLE",
+    );
+
+    const account = await m3.createAccount(userId, { name: "M4 cash", type: "cash", opening_balance: "0" }, `m4-account-${randomUUID()}`);
+    const category = await m3.createCategory(userId, { name: "M4 subscriptions", type: "expense" }, `m4-category-${randomUUID()}`);
+    const financeRule = await m4.createFinanceRule(userId, {
+      type: "expense", account_id: account.data.id, category_id: category.data.id, amount: "15000", note: "Subscription",
+      frequency: "monthly", start_date: "2026-08-31",
+    }, `m4-finance-rule-${randomUUID()}`);
+    assert.equal((await m4.processDueRules()).financeOccurrences, 1);
+    const financeOccurrences = await m4.listFinanceOccurrences(userId, financeRule.data.id, "2026-08-01", "2026-09-30", 1, 25);
+    assert.deepEqual(financeOccurrences.data.map((transaction) => [transaction.occurrence_date, transaction.status, transaction.rule_version]), [
+      ["2026-08-31", "draft", 1],
+    ]);
+    await assert.rejects(
+      m3.archiveAccount(userId, account.data.id, account.data.version),
+      (error: unknown) => error instanceof FinanceError && error.code === "RESOURCE_IN_USE",
+    );
+    const stopped = await m4.stopFinanceRule(userId, financeRule.data.id, financeRule.data.version);
+    assert.equal(stopped.status, "stopped");
+  });
+
+  await t.test("M5 summarizes immutable facts and exports the same scoped records", async () => {
+    assert.ok(userId);
+    const current = new Date("2026-09-22T06:00:00.000Z");
+    const m1 = createPrismaM1Service(prisma, { now: () => current });
+    const m2 = createPrismaM2Service(prisma, { now: () => current });
+    const m3 = createPrismaM3Service(prisma, { now: () => current });
+    const m5 = createPrismaM5Service(prisma, { now: () => current });
+    const project = await m1.createProject(userId, { name: "M5 project" }, `m5-project-${randomUUID()}`);
+    const task = await m1.createTask(userId, { title: "M5 task", project_id: project.data.id }, `m5-task-${randomUUID()}`);
+    const firstDone = await m1.setTaskStatus(userId, task.data.id, { version: task.data.version, status: "done" });
+    const reopened = await m1.setTaskStatus(userId, task.data.id, { version: firstDone.version, status: "todo" });
+    await m1.setTaskStatus(userId, task.data.id, { version: reopened.version, status: "done" });
+
+    const day = await prisma.pomodoroDay.upsert({ where: { user_id_cycle_date: { user_id: userId, cycle_date: new Date("2026-09-22T00:00:00.000Z") } }, create: { user_id: userId, cycle_date: new Date("2026-09-22T00:00:00.000Z"), timezone: "Asia/Jakarta" }, update: {} });
+    const session = await prisma.pomodoroSession.create({ data: { user_id: userId, cycle_day_id: day.id, phase: "focus", status: "completed", planned_seconds: 1500, task_id: task.data.id, project_id_at_start: project.data.id, task_title_snapshot: "M5 task", project_name_snapshot: "M5 project", started_at: new Date("2026-09-22T07:00:00.000Z"), due_at: null, ended_at: new Date("2026-09-22T07:25:00.000Z") } });
+    await prisma.pomodoroInterval.create({ data: { user_id: userId, session_id: session.id, started_at: new Date("2026-09-22T07:00:00.000Z"), ended_at: new Date("2026-09-22T07:25:00.000Z") } });
+
+    const habit = await m2.createHabit(userId, { name: "M5 habit", start_date: "2026-09-22", weekdays: [1, 2, 3, 4, 5, 6, 7] }, `m5-habit-${randomUUID()}`);
+    await m2.setHabitCheckIn(userId, habit.data.id, "2026-09-22");
+    const account = await m3.createAccount(userId, { name: "M5 cash", type: "cash", opening_balance: "0" }, `m5-account-${randomUUID()}`);
+    const category = await m3.createCategory(userId, { name: "M5 food", type: "expense" }, `m5-category-${randomUUID()}`);
+    await m3.createTransaction(userId, { type: "expense", status: "posted", account_id: account.data.id, category_id: category.data.id, amount: "9000", date: "2026-09-22", note: "M5, note" }, `m5-transaction-${randomUUID()}`);
+    await m3.createBudget(userId, { category_id: category.data.id, month: "2026-09-01", limit_amount: "10000" }, `m5-budget-${randomUUID()}`);
+
+    const projectSummary = await m5.projectSummary(userId, project.data.id, { from: "2026-09-22", to: "2026-09-22" });
+    assert.equal(projectSummary.tasks.completed_count, 2);
+    assert.equal(projectSummary.tasks.distinct_task_count, 1);
+    assert.equal(projectSummary.pomodoro.per_project.find((row) => row.project_id === project.data.id)?.focus_duration_ms, 1_500_000);
+    const habitSummary = await m5.habitSummary(userId, { from: "2026-09-22", to: "2026-09-22" });
+    assert.deepEqual(habitSummary.habits.find((row) => row.habit_id === habit.data.id), { habit_id: habit.data.id, name: "M5 habit", timezone: "Asia/Jakarta", scheduled_days: 1, completed_days: 1, ratio: 1 });
+    const financeSummary = await m5.financeSummary(userId, { from: "2026-09-22", to: "2026-09-22" });
+    assert.equal(financeSummary.finance.per_category.find((row) => row.category_id === category.data.id)?.total, "9000");
+    assert.equal(financeSummary.budgets.find((row) => row.category_id === category.data.id)?.spent, "9000");
+    const csv = await m5.exportProject(userId, project.data.id, "tasks", { from: "2026-09-22", to: "2026-09-22" });
+    assert.match(csv.body, /event_id,task_id/);
+    assert.equal(csv.body.split("\r\n").filter(Boolean).length, 3);
   });
 });

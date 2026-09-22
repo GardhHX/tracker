@@ -9,6 +9,9 @@ import { createPostgresRateLimiter } from "./lib/ratelimit.js";
 import { createPrismaM1Service } from "./modules/work/service.prisma.js";
 import { createPrismaM2Service } from "./modules/m2/service.prisma.js";
 import { createPrismaM3Service } from "./modules/finance/service.prisma.js";
+import { createPrismaM4Service } from "./modules/m4/service.prisma.js";
+import { createPrismaM5Service } from "./modules/m5/service.prisma.js";
+import { logInfo } from "./lib/observability.js";
 
 const app = createApp({
   repo: createPrismaAuthRepo(prisma),
@@ -30,6 +33,11 @@ const app = createApp({
   m1: createPrismaM1Service(prisma),
   m2: createPrismaM2Service(prisma),
   m3: createPrismaM3Service(prisma),
+  m4: createPrismaM4Service(prisma),
+  m5: createPrismaM5Service(prisma),
+  readinessCheck: async () => {
+    await prisma.$queryRawUnsafe("SELECT 1");
+  },
   ...(googleEnabled
     ? { google: createGoogleProvider({ clientId: env.googleClientId!, clientSecret: env.googleClientSecret!, redirectUri: env.googleRedirectUri }) }
     : {}),
@@ -37,11 +45,12 @@ const app = createApp({
 
 const server = createServer(app);
 server.listen(env.port, () => {
-  console.log(`[tracker-api] listening on http://127.0.0.1:${env.port} (${env.nodeEnv})`);
+  logInfo("api_started", { port: env.port, environment: env.nodeEnv });
 });
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {
+    logInfo("api_shutdown", { signal });
     server.close(() => void prisma.$disconnect().finally(() => process.exit(0)));
   });
 }
