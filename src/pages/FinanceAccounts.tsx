@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import AppShell from "@/components/AppShell";
 import Modal from "@/components/Modal";
+import ReportPanel from "@/components/ReportPanel";
 import { IconPlus, IconWallet } from "@/components/icons";
 import {
   TrackerApiError, archiveFinanceAccount, archiveFinanceCategory, createFinanceAccount, createFinanceBudget, createFinanceCategory,
-  createFinanceTransaction, deleteFinanceBudget, listFinanceAccounts, listFinanceBalanceChanges, listFinanceBudgets, listFinanceCategories,
-  listFinanceRevisions, listFinanceTransactions, patchFinanceAccount, patchFinanceBudget, patchFinanceTransaction, postFinanceTransaction, voidFinanceTransaction,
-  type FinanceRevisionDto,
+  createFinanceRule, createFinanceTransaction, deleteFinanceBudget, listFinanceAccounts, listFinanceBalanceChanges, listFinanceBudgets, listFinanceCategories,
+  listFinanceRuleOccurrences, listFinanceRuleRevisions, listFinanceRevisions, listFinanceRules, listFinanceTransactions, patchFinanceAccount, patchFinanceBudget, patchFinanceRule, patchFinanceTransaction, postFinanceTransaction, stopFinanceRule, voidFinanceTransaction,
+  type FinanceRevisionDto, type FinanceRuleDto, type RuleRevisionDto,
 } from "@/lib/api";
 
 type AcctType = "cash" | "bank" | "ewallet";
@@ -51,6 +52,11 @@ function fmtDateLong(iso: string) {
 }
 function fmtRevTime(iso: string) {
   return new Date(iso).toLocaleString("en-US", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+function recurrenceLabel(frequency: "daily" | "weekly" | "monthly", interval: number) {
+  const singular = { daily: "day", weekly: "week", monthly: "month" }[frequency];
+  return `Every ${interval === 1 ? "" : `${interval} `}${singular}${interval === 1 ? "" : "s"}`;
 }
 
 
@@ -304,6 +310,54 @@ function TransactionForm({ accounts, categories, initial, onCancel, onSave }: { 
   );
 }
 
+function FinanceRuleForm({ rule, accounts, categories, onCancel, onSave }: { rule?: FinanceRuleDto; accounts: Account[]; categories: Category[]; onCancel: () => void; onSave: (value: { type: TxType; account_id: string; to_account_id: string | null; category_id: string | null; amount: string; note: string | null; frequency: "daily" | "weekly" | "monthly"; interval: number; start_date: string; end_date: string | null }) => Promise<void> }) {
+  const activeAccounts = accounts.filter((account) => !account.archived);
+  const [type, setType] = useState<TxType>(rule?.type ?? "expense");
+  const [accountId, setAccountId] = useState(rule?.account_id ?? activeAccounts[0]?.id ?? "");
+  const [toAccountId, setToAccountId] = useState(rule?.to_account_id ?? activeAccounts.find((account) => account.id !== rule?.account_id)?.id ?? "");
+  const [categoryId, setCategoryId] = useState(rule?.category_id ?? "");
+  const [amount, setAmount] = useState(rule?.amount ?? "");
+  const [note, setNote] = useState(rule?.note ?? "");
+  const [frequency, setFrequency] = useState<"daily" | "weekly" | "monthly">(rule?.frequency ?? "monthly");
+  const [interval, setInterval] = useState(String(rule?.interval ?? 1));
+  const [startDate, setStartDate] = useState(rule?.start_date ?? TODAY);
+  const [endDate, setEndDate] = useState(rule?.end_date ?? "");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const visibleCategories = categories.filter((category) => category.type === type && !category.archived);
+
+  function changeType(next: TxType) {
+    setType(next);
+    if (next === "transfer") { setCategoryId(""); return; }
+    setCategoryId(categories.find((category) => category.type === next && !category.archived)?.id ?? "");
+  }
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    const every = Number(interval);
+    if (!accountId) return setError("Choose an account.");
+    if (!digits(amount) || BigInt(digits(amount)) <= 0n) return setError("Enter an amount greater than zero.");
+    if (type === "transfer" && (!toAccountId || toAccountId === accountId)) return setError("Choose a different destination account.");
+    if (type !== "transfer" && !categoryId) return setError("Choose a category.");
+    if (!Number.isInteger(every) || every < 1 || every > 365) return setError("Interval must be between 1 and 365.");
+    if (!startDate) return setError("Start date is required.");
+    if (endDate && endDate < startDate) return setError("End date cannot be before the start date.");
+    setSaving(true); setError("");
+    try { await onSave({ type, account_id: accountId, to_account_id: type === "transfer" ? toAccountId : null, category_id: type === "transfer" ? null : categoryId, amount: digits(amount), note: note.trim() || null, frequency, interval: every, start_date: startDate, end_date: endDate || null }); }
+    catch (cause) { setError(cause instanceof TrackerApiError ? cause.message : "Finance could not complete the request."); setSaving(false); }
+  }
+  return <form onSubmit={submit} noValidate>
+    {error && <div className="form-alert error" role="alert">{error}</div>}
+    <div className="field"><label htmlFor="finance-rule-type">Type</label><select id="finance-rule-type" className="input" value={type} onChange={(event) => changeType(event.target.value as TxType)}><option value="expense">Expense</option><option value="income">Income</option><option value="transfer">Transfer</option></select></div>
+    <div className="field"><label htmlFor="finance-rule-account">{type === "transfer" ? "From account" : "Account"}</label><select id="finance-rule-account" className="input" value={accountId} onChange={(event) => setAccountId(event.target.value)}>{activeAccounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select></div>
+    {type === "transfer" ? <div className="field"><label htmlFor="finance-rule-to-account">To account</label><select id="finance-rule-to-account" className="input" value={toAccountId} onChange={(event) => setToAccountId(event.target.value)}>{activeAccounts.filter((account) => account.id !== accountId).map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select></div> : <div className="field"><label htmlFor="finance-rule-category">Category</label><select id="finance-rule-category" className="input" value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>{visibleCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></div>}
+    <div style={{ display: "flex", gap: 12 }}><div className="field" style={{ flex: 1 }}><label htmlFor="finance-rule-amount">Amount</label><AmountInput id="finance-rule-amount" value={amount} onChange={setAmount} /></div><div className="field" style={{ flex: 1 }}><label htmlFor="finance-rule-note">Note</label><input id="finance-rule-note" className="input" maxLength={2000} value={note} onChange={(event) => setNote(event.target.value)} /></div></div>
+    <div style={{ display: "flex", gap: 12 }}><div className="field" style={{ flex: 1 }}><label htmlFor="finance-rule-frequency">Repeats</label><select id="finance-rule-frequency" className="input" value={frequency} onChange={(event) => setFrequency(event.target.value as typeof frequency)}><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></div><div className="field" style={{ flex: 1 }}><label htmlFor="finance-rule-interval">Every</label><input id="finance-rule-interval" className="input" type="number" min="1" max="365" value={interval} onChange={(event) => setInterval(event.target.value)} /></div></div>
+    <div style={{ display: "flex", gap: 12 }}><div className="field" style={{ flex: 1 }}><label htmlFor="finance-rule-start">Start date</label><input id="finance-rule-start" className="input" type="date" value={startDate} disabled={Boolean(rule)} onChange={(event) => setStartDate(event.target.value)} /></div><div className="field" style={{ flex: 1 }}><label htmlFor="finance-rule-end">End date</label><input id="finance-rule-end" className="input" type="date" min={startDate} value={endDate} onChange={(event) => setEndDate(event.target.value)} /></div></div>
+    <p className="field-hint">Each due occurrence is created as a draft so you can check it before it changes a balance.</p>
+    <div className="modal-foot"><button type="button" className="btn btn-quiet" onClick={onCancel}>Cancel</button><button type="submit" className="btn btn-primary" disabled={saving}>{saving ? "Saving…" : rule ? "Save rule" : "Create rule"}</button></div>
+  </form>;
+}
+
 function TransferForm({ accounts, balanceOf, initial, onCancel, onSave }: { accounts: Account[]; balanceOf: (id: string) => bigint; initial?: Transaction; onCancel: () => void; onSave: (input: { fromId: string; toId: string; amount: string }) => void }) {
   const active = accounts.filter((a) => !a.archived);
   const [fromId, setFromId] = useState(initial?.accountId ?? active[0]?.id ?? "");
@@ -503,6 +557,14 @@ export default function FinancePage() {
   const [correctingId, setCorrectingId] = useState<string | null>(null);
   const [addingTx, setAddingTx] = useState(false);
   const [transferring, setTransferring] = useState(false);
+  const [ruleMode, setRuleMode] = useState<"list" | "create" | "edit" | "detail" | null>(null);
+  const [rules, setRules] = useState<FinanceRuleDto[]>([]);
+  const [rulesLoading, setRulesLoading] = useState(false);
+  const [rulesError, setRulesError] = useState("");
+  const [activeRuleId, setActiveRuleId] = useState<string | null>(null);
+  const [ruleOccurrences, setRuleOccurrences] = useState<Array<{ id: string; date: string; status: TxStatus; amount: string }>>([]);
+  const [ruleRevisions, setRuleRevisions] = useState<RuleRevisionDto[]>([]);
+  const [ruleDetailLoading, setRuleDetailLoading] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [addingBudget, setAddingBudget] = useState(false);
@@ -531,7 +593,7 @@ export default function FinancePage() {
     setTransactions(transactionPage.data.map((transaction) => ({
       id: transaction.id, version: transaction.version, type: transaction.type, status: transaction.status, accountId: transaction.account_id,
       toAccountId: transaction.to_account_id ?? undefined, categoryId: transaction.category_id ?? undefined, amount: BigInt(transaction.amount),
-      date: transaction.date, note: transaction.note ?? undefined, revisions: [],
+      date: transaction.date, note: transaction.note ?? undefined, fromRecurring: transaction.recurrence_rule_id !== null, revisions: [],
     })));
     setBudgets(budgetPage.data.map((budget) => ({ id: budget.id, version: budget.version, categoryId: budget.category_id, limit: BigInt(budget.limit_amount), spent: BigInt(budget.spent), remaining: BigInt(budget.remaining) })));
   }
@@ -651,17 +713,56 @@ export default function FinancePage() {
     await complete(async () => { await patchFinanceBudget(budget.id, budget.version, limit); setEditingBudgetId(null); });
   }
 
+  async function openRules() {
+    setRuleMode("list"); setRulesLoading(true); setRulesError("");
+    try { setRules((await listFinanceRules("all")).data); } catch (error) { setRulesError(messageOf(error)); }
+    finally { setRulesLoading(false); }
+  }
+  async function openRuleDetail(id: string) {
+    setActiveRuleId(id); setRuleMode("detail"); setRuleDetailLoading(true); setRulesError("");
+    const monthEnd = new Date(Date.UTC(Number(MONTH.slice(0, 4)), Number(MONTH.slice(5, 7)), 0)).toISOString().slice(0, 10);
+    try {
+      const [occurrences, revisions] = await Promise.all([listFinanceRuleOccurrences(id, MONTH_START, monthEnd), listFinanceRuleRevisions(id)]);
+      setRuleOccurrences(occurrences.data.map((occurrence) => ({ id: occurrence.id, date: occurrence.date, status: occurrence.status, amount: occurrence.amount })));
+      setRuleRevisions(revisions.data);
+    } catch (error) { setRulesError(messageOf(error)); }
+    finally { setRuleDetailLoading(false); }
+  }
+  async function saveRule(value: Parameters<typeof createFinanceRule>[0]) {
+    if (ruleMode === "edit" && activeRuleId) {
+      const current = rules.find((rule) => rule.id === activeRuleId);
+      if (!current) return;
+      const { start_date: _startDate, ...patch } = value;
+      const updated = await patchFinanceRule(current.id, { ...patch, version: current.version });
+      setRules((currentRules) => currentRules.map((rule) => rule.id === updated.id ? updated : rule));
+    } else {
+      const created = await createFinanceRule(value);
+      setRules((currentRules) => [created, ...currentRules]);
+    }
+    setRuleMode("list");
+  }
+  async function stopRule(rule: FinanceRuleDto) {
+    setRulesError("");
+    try {
+      const updated = await stopFinanceRule(rule.id, rule.version);
+      setRules((current) => current.map((item) => item.id === updated.id ? updated : item));
+      if (activeRuleId === updated.id) await openRuleDetail(updated.id);
+    } catch (error) { setRulesError(messageOf(error)); }
+  }
+
   const correcting = accountById(correctingId ?? undefined) ?? null;
   const editing = transactions.find((transaction) => transaction.id === editingId && transaction.type !== "transfer") ?? null;
   const editingTransfer = transactions.find((transaction) => transaction.id === editingId && transaction.type === "transfer") ?? null;
   const editingBudget = budgets.find((budget) => budget.id === editingBudgetId) ?? null;
   const budgetlessExpenseCats = categories.filter((c) => c.type === "expense" && !c.archived && !budgets.some((b) => b.categoryId === c.id));
+  const activeRule = rules.find((rule) => rule.id === activeRuleId) ?? null;
 
   return (
     <AppShell active="finance" title="Finance">
       <div className="page-head">
         <h1>Finance</h1>
       </div>
+      <ReportPanel scope="finance" />
 
       {errorMessage && <div className="error-banner" role="alert"><span>{errorMessage}</span><button type="button" className="btn btn-sm" onClick={() => { setErrorMessage(undefined); setLoading(true); refresh().catch((error) => setErrorMessage(messageOf(error))).finally(() => setLoading(false)); }}>Retry</button></div>}
       {loading && <div className="empty-state" aria-live="polite"><h1>Loading finance data</h1><p>Reading accounts, transactions, categories, and budgets from Tracker.</p></div>}
@@ -778,6 +879,7 @@ export default function FinancePage() {
               <option value="transfer">Type: Transfer</option>
             </select>
             <span className="spacer" />
+            <button type="button" className="btn btn-sm" onClick={() => void openRules()}>Recurring rules</button>
             <button type="button" className="btn btn-sm" onClick={() => setTransferring(true)}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                 <path d="m17 2 4 4-4 4" />
@@ -949,6 +1051,23 @@ export default function FinancePage() {
       {transferring && (
         <Modal title="Transfer between accounts" onClose={() => setTransferring(false)}>
           <TransferForm accounts={accounts} balanceOf={balanceOf} onCancel={() => setTransferring(false)} onSave={addTransfer} />
+        </Modal>
+      )}
+
+      {ruleMode && (
+        <Modal title={ruleMode === "create" ? "New recurring transaction" : ruleMode === "edit" ? "Edit recurring transaction" : ruleMode === "detail" ? "Recurring transaction" : "Recurring transactions"} onClose={() => { setRuleMode(null); setActiveRuleId(null); setRulesError(""); }}>
+          {rulesError && <div className="form-alert error" role="alert">{rulesError}</div>}
+          {(ruleMode === "create" || ruleMode === "edit") && <FinanceRuleForm rule={ruleMode === "edit" ? activeRule ?? undefined : undefined} accounts={accounts} categories={categories} onCancel={() => setRuleMode("list")} onSave={saveRule} />}
+          {ruleMode === "detail" && (ruleDetailLoading ? <div className="empty-state"><p>Loading rule history…</p></div> : activeRule ? <>
+            <div className="detail-chips"><span className="chip">{recurrenceLabel(activeRule.frequency, activeRule.interval)}</span><span className="chip">{activeRule.status}</span>{activeRule.next_date && <span className="chip">Next {activeRule.next_date}</span>}</div>
+            <div className="detail-section"><label>This month</label>{ruleOccurrences.length === 0 ? <p className="field-hint">No occurrences in this month.</p> : ruleOccurrences.map((occurrence) => <div className="detail-hist-row" key={occurrence.id}><span className="dh-k">{rp(BigInt(occurrence.amount))} <span className="chip">{occurrence.status}</span></span><span className="tnum">{occurrence.date}</span></div>)}</div>
+            <div className="detail-section"><label>Rule history</label>{ruleRevisions.map((revision) => <div className="detail-hist-row" key={revision.id}><span className="dh-k">{revision.action} · version {revision.rule_version}</span><span className="tnum">{new Date(revision.changed_at).toLocaleDateString()}</span></div>)}</div>
+            <div className="modal-foot"><button type="button" className="btn btn-quiet" onClick={() => setRuleMode("list")}>Back</button>{activeRule.status === "active" && <><button type="button" className="btn" onClick={() => setRuleMode("edit")}>Edit</button><button type="button" className="btn btn-primary" onClick={() => void stopRule(activeRule)}>Stop rule</button></>}</div>
+          </> : null)}
+          {ruleMode === "list" && (rulesLoading ? <div className="empty-state"><p>Loading recurring transactions…</p></div> : <>
+            <div className="detail-actions"><button type="button" className="btn btn-primary" onClick={() => { setActiveRuleId(null); setRuleMode("create"); }}><IconPlus width={16} height={16} /> New recurring transaction</button></div>
+            {rules.length === 0 ? <div className="empty-state"><p>No recurring transactions yet.</p></div> : <div className="task-list">{rules.map((rule) => <div className="task-row" key={rule.id}><button type="button" className="task-row-title" onClick={() => void openRuleDetail(rule.id)}>{rule.type === "transfer" ? `Transfer: ${accountById(rule.account_id)?.name ?? "Account"} to ${accountById(rule.to_account_id ?? undefined)?.name ?? "Account"}` : categoryById(rule.category_id ?? undefined)?.name ?? "Uncategorised"}</button><div className="task-row-meta"><span className="chip">{recurrenceLabel(rule.frequency, rule.interval)}</span><span className="chip">{rule.status}</span><span className="task-row-due">{rp(BigInt(rule.amount))}</span>{rule.next_date && <span className="task-row-due">Next {rule.next_date}</span>}{rule.status === "active" && <button type="button" className="btn btn-sm btn-quiet" onClick={() => void stopRule(rule)}>Stop</button>}</div></div>)}</div>}
+          </>)}
         </Modal>
       )}
 

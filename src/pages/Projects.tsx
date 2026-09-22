@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import AppShell from "@/components/AppShell";
 import Modal from "@/components/Modal";
+import ReportPanel from "@/components/ReportPanel";
 import { IconArrowLeft, IconKanban, IconPlus } from "@/components/icons";
 import { TrackerApiError, createProject, listProjects, listTasks, patchProject, setProjectStatus, type ProjectDto, type ProjectStatus, type TaskDto, type TaskStatus } from "@/lib/api";
 
@@ -75,6 +76,7 @@ export default function ProjectsPage() {
       <div className="pd-figure"><div className="pd-pct">{openProject.progress_percent}%</div><div className="pd-caption">complete</div></div>
     </div>
     <div className="pd-bar"><div className="pbar"><i style={{ width: `${openProject.progress_percent}%` }} /></div></div>
+    <ReportPanel scope="projects" projectId={openProject.id} />
     <div className="toolbar" style={{ marginTop: 16 }}><div className="seg" role="tablist" aria-label="Project task view"><button role="tab" aria-selected={view === "board"} type="button" onClick={() => setView("board")}>Board</button><button role="tab" aria-selected={view === "list"} type="button" onClick={() => setView("list")}>List</button></div><span className="spacer" />{openProject.status === "active" && <Link className="btn btn-primary btn-sm" to="/tasks"><IconPlus width={16} height={16} /> Add task</Link>}</div>
     {projectTasks.length === 0 ? <div className="empty-state"><span className="es-ic" aria-hidden><IconKanban width={22} height={22} /></span><h1>No tasks yet</h1><p>Add a task from Tasks and select this project.</p>{openProject.status === "active" && <Link className="btn btn-primary" to="/tasks">Open Tasks</Link>}</div>
       : view === "board" ? <div className="kanban">{(["todo", "in_progress", "done"] as TaskStatus[]).map((status) => <div className="kan-col" key={status}><div className="kan-col-head"><span>{STATUS_LABEL[status]}</span><span className="count-badge">{projectTasks.filter((task) => task.status === status).length}</span></div>{projectTasks.filter((task) => task.status === status).map((task) => <div className={`kan-card${status === "done" ? " is-done" : ""}`} key={task.id}><span className="kc-title">{task.title}</span><div className="kc-meta"><span className="chip">{task.priority[0].toUpperCase() + task.priority.slice(1)}</span>{task.due_date && <span className="chip">{task.due_date}</span>}</div></div>)}</div>)}</div>

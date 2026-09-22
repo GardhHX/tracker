@@ -11,7 +11,15 @@ import {
   setHabitCheckIn,
   startPomodoro,
   createFinanceTransaction,
+  createFinanceRule,
+  createTaskRule,
   listFinanceAccounts,
+  listFinanceRules,
+  listTaskRules,
+  setTaskDependency,
+  stopFinanceRule,
+  downloadTaskCsv,
+  getTaskReport,
 } from "./api.js";
 
 test("googleStartUrl targets the custom Express OAuth start endpoint", () => {
@@ -177,4 +185,62 @@ test("M3 clients preserve rupiah strings and send idempotency", async () => {
   assert.equal(calls[2]?.init?.method, "POST");
   assert.ok(((calls[2]?.init?.headers as Record<string, string>)["idempotency-key"] ?? "").length >= 8);
   assert.match(String(calls[2]?.init?.body), /9007199254740993/);
+});
+
+test("M4 task rule and dependency clients use their static Task routes", async () => {
+  const calls: Array<{ input: string; init?: RequestInit }> = [];
+  const rule = { id: "rule-1", version: 1, created_at: "2026-09-22T00:00:00.000Z", updated_at: "2026-09-22T00:00:00.000Z", title: "Pay rent", description: null, project_id: null, priority: "medium", frequency: "monthly", interval: 1, start_date: "2026-09-22", end_date: null, timezone: "Asia/Jakarta", status: "active", next_date: "2026-09-22", last_generated_date: null, processing_updated_at: null, blocked_reason: null } as const;
+  const fakeFetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    calls.push({ input: String(input), init });
+    if (String(input).endsWith("/auth/csrf")) return new Response(JSON.stringify({ data: { token: "csrf-m4" } }), { status: 200, headers: { "content-type": "application/json" } });
+    if (init?.method === "PUT") return new Response(JSON.stringify({ data: { task_id: "task-1", predecessor_id: "task-0", predecessor_status: "todo", predecessor_title: "Prep", created_at: "2026-09-22T00:00:00.000Z" } }), { status: 200, headers: { "content-type": "application/json" } });
+    if (init?.method === "POST") return new Response(JSON.stringify({ data: rule }), { status: 201, headers: { "content-type": "application/json" } });
+    return new Response(JSON.stringify({ data: [rule], meta: { page: 1, page_size: 100, total: 1 } }), { status: 200, headers: { "content-type": "application/json" } });
+  }) as typeof fetch;
+
+  assert.equal((await listTaskRules("all", fakeFetch)).data[0]?.title, "Pay rent");
+  await createTaskRule({ title: "Pay rent", frequency: "monthly", start_date: "2026-09-22" }, fakeFetch);
+  await setTaskDependency("task-1", "task-0", fakeFetch);
+
+  assert.equal(calls[0]?.input, "/api/v1/tasks/recurrences?status=all&page_size=100");
+  assert.equal(calls[2]?.input, "/api/v1/tasks/recurrences");
+  assert.ok(((calls[2]?.init?.headers as Record<string, string>)["idempotency-key"] ?? "").length >= 8);
+  assert.equal(calls[4]?.input, "/api/v1/tasks/task-1/dependencies/task-0");
+  assert.equal(calls[4]?.init?.method, "PUT");
+});
+
+test("M4 finance rule clients preserve draft recurrence endpoints and idempotency", async () => {
+  const calls: Array<{ input: string; init?: RequestInit }> = [];
+  const rule = { id: "rule-2", version: 1, created_at: "2026-09-22T00:00:00.000Z", updated_at: "2026-09-22T00:00:00.000Z", type: "expense", account_id: "account-1", to_account_id: null, category_id: "category-1", amount: "300000", note: null, frequency: "monthly", interval: 1, start_date: "2026-09-22", end_date: null, timezone: "Asia/Jakarta", status: "active", next_date: "2026-09-22", last_generated_date: null, processing_updated_at: null, blocked_reason: null } as const;
+  const fakeFetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    calls.push({ input: String(input), init });
+    if (String(input).endsWith("/auth/csrf")) return new Response(JSON.stringify({ data: { token: "csrf-m4-finance" } }), { status: 200, headers: { "content-type": "application/json" } });
+    return new Response(JSON.stringify({ data: !init?.method ? [rule] : rule, meta: { page: 1, page_size: 100, total: 1 } }), { status: init?.method === "POST" && String(input).endsWith("recurrences") ? 201 : 200, headers: { "content-type": "application/json" } });
+  }) as typeof fetch;
+
+  assert.equal((await listFinanceRules("all", fakeFetch)).data[0]?.amount, "300000");
+  await createFinanceRule({ type: "expense", account_id: "account-1", category_id: "category-1", amount: "300000", frequency: "monthly", start_date: "2026-09-22" }, fakeFetch);
+  await stopFinanceRule("rule-2", 1, fakeFetch);
+
+  assert.equal(calls[0]?.input, "/api/v1/finance/recurrences?status=all&page_size=100");
+  assert.equal(calls[2]?.input, "/api/v1/finance/recurrences");
+  assert.ok(((calls[2]?.init?.headers as Record<string, string>)["idempotency-key"] ?? "").length >= 8);
+  assert.equal(calls[4]?.input, "/api/v1/finance/recurrences/rule-2/stop");
+  assert.equal(calls[4]?.init?.method, "POST");
+});
+
+test("M5 report clients preserve the selected date range for summaries and CSV", async () => {
+  const calls: Array<{ input: string; init?: RequestInit }> = [];
+  const fakeFetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    calls.push({ input: String(input), init });
+    if ((init?.headers as Record<string, string> | undefined)?.accept === "text/csv") return new Response("event_id\r\nevent-1\r\n", { status: 200, headers: { "content-type": "text/csv; charset=utf-8" } });
+    return new Response(JSON.stringify({ data: { range: { from: "2026-09-01", to: "2026-09-22", timezone: "Asia/Jakarta" }, tasks: { completed_count: 1, distinct_task_count: 1, per_project: [] } } }), { status: 200, headers: { "content-type": "application/json" } });
+  }) as typeof fetch;
+  const summary = await getTaskReport("2026-09-01", "2026-09-22", fakeFetch);
+  assert.equal(summary.tasks.completed_count, 1);
+  assert.equal(calls[0]?.input, "/api/v1/tasks/reports/summary?from=2026-09-01&to=2026-09-22");
+  const csv = await downloadTaskCsv("2026-09-01", "2026-09-22", fakeFetch);
+  assert.equal(csv, "event_id\r\nevent-1\r\n");
+  assert.equal(calls[1]?.input, "/api/v1/tasks/reports/export?from=2026-09-01&to=2026-09-22");
+  assert.equal((calls[1]?.init?.headers as Record<string, string>).accept, "text/csv");
 });

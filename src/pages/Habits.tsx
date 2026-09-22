@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import AppShell from "@/components/AppShell";
 import Modal from "@/components/Modal";
+import ReportPanel from "@/components/ReportPanel";
 import { IconPlus, IconRepeat } from "@/components/icons";
 import { archiveHabit, createHabit, deleteHabitCheckIn, listHabitCheckIns, listHabits, listHabitSchedules, patchHabit, setHabitCheckIn, setHabitSchedule, TrackerApiError } from "@/lib/api";
 
@@ -386,6 +387,7 @@ export default function HabitsPage() {
           <IconPlus width={16} height={16} /> New habit
         </button>
       </div>
+      <ReportPanel scope="habits" />
 
       {pageError && <div className="form-alert error" role="alert" style={{ marginBottom: 16 }}>{pageError}</div>}
       {loading ? <div className="empty-state"><p>Loading habits…</p></div> : habits.length === 0 ? (

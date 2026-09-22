@@ -15,6 +15,10 @@ type ErrorEnvelope = {
 };
 type DataEnvelope<T> = { data: T };
 
+function browserIsOffline() {
+  return typeof window !== "undefined" && typeof navigator !== "undefined" && !navigator.onLine;
+}
+
 export class TrackerApiError extends Error {
   readonly status: number;
   readonly code: string;
@@ -71,6 +75,9 @@ async function throwApiError(response: Response): Promise<never> {
 
 async function post<T>(path: string, body: unknown, fetcher: Fetcher): Promise<T> {
   try {
+    if (browserIsOffline()) {
+      throw new TrackerApiError({ status: 0, code: "OFFLINE", message: "You are offline. Reconnect before saving changes." });
+    }
     const csrfResponse = await fetcher(apiUrl("/api/v1/auth/csrf"), {
       credentials: "include",
       headers: { accept: "application/json" },
@@ -121,6 +128,9 @@ async function post<T>(path: string, body: unknown, fetcher: Fetcher): Promise<T
 async function request<T>(path: string, options: { method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; body?: unknown; idempotencyKey?: string } = {}, fetcher: Fetcher = fetch): Promise<T> {
   try {
     const method = options.method ?? "GET";
+    if (method !== "GET" && browserIsOffline()) {
+      throw new TrackerApiError({ status: 0, code: "OFFLINE", message: "You are offline. Reconnect before saving changes." });
+    }
     const headers: Record<string, string> = { accept: "application/json" };
     if (method !== "GET") {
       const csrfResponse = await fetcher(apiUrl("/api/v1/auth/csrf"), { credentials: "include", headers });
@@ -168,6 +178,9 @@ async function requestEnvelope<T>(path: string, options: { method?: "GET" | "POS
 
 async function deleteRequest(path: string, version: number, fetcher: Fetcher = fetch): Promise<void> {
   try {
+    if (browserIsOffline()) {
+      throw new TrackerApiError({ status: 0, code: "OFFLINE", message: "You are offline. Reconnect before saving changes." });
+    }
     const csrfResponse = await fetcher(apiUrl("/api/v1/auth/csrf"), { credentials: "include", headers: { accept: "application/json" } });
     if (!csrfResponse.ok) await throwApiError(csrfResponse);
     const csrfPayload = await readJson<DataEnvelope<{ token: string }>>(csrfResponse);
@@ -186,6 +199,9 @@ async function deleteRequest(path: string, version: number, fetcher: Fetcher = f
 
 async function deleteWithoutBody(path: string, fetcher: Fetcher = fetch): Promise<void> {
   try {
+    if (browserIsOffline()) {
+      throw new TrackerApiError({ status: 0, code: "OFFLINE", message: "You are offline. Reconnect before saving changes." });
+    }
     const csrfResponse = await fetcher(apiUrl("/api/v1/auth/csrf"), { credentials: "include", headers: { accept: "application/json" } });
     if (!csrfResponse.ok) await throwApiError(csrfResponse);
     const csrfPayload = await readJson<DataEnvelope<{ token: string }>>(csrfResponse);
@@ -215,6 +231,24 @@ function idempotencyKey() {
   return globalThis.crypto?.randomUUID?.() ?? `tracker-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+function reportQuery(from?: string, to?: string) {
+  const query = new URLSearchParams();
+  if (from && to) { query.set("from", from); query.set("to", to); }
+  const value = query.toString();
+  return value ? `?${value}` : "";
+}
+
+async function csvRequest(path: string, fetcher: Fetcher = fetch) {
+  try {
+    const response = await fetcher(apiUrl(path), { credentials: "include", headers: { accept: "text/csv" } });
+    if (!response.ok) await throwApiError(response);
+    return response.text();
+  } catch (cause) {
+    if (cause instanceof TrackerApiError) throw cause;
+    throw new TrackerApiError({ status: 0, code: "SERVICE_UNAVAILABLE", message: "Tracker could not reach the API." });
+  }
+}
+
 export type ProjectStatus = "active" | "completed" | "archived";
 export type TaskStatus = "todo" | "in_progress" | "done";
 export type TaskPriority = "low" | "medium" | "high";
@@ -226,7 +260,7 @@ export type ProjectDto = {
 export type TaskDto = {
   id: string; version: number; created_at: string; updated_at: string; project_id: string | null; title: string; description: string | null;
   status: TaskStatus; priority: TaskPriority; due_date: string | null; completed_at: string | null; archived_at: string | null;
-  recurrence_rule_id: null; occurrence_date: null; rule_version: null;
+  recurrence_rule_id: string | null; occurrence_date: string | null; rule_version: number | null;
 };
 export type TaskEventDto = {
   id: string; task_id: string; task_version: number; event_type: "created" | "edited" | "status_changed" | "project_changed" | "archived" | "unarchived";
@@ -248,6 +282,28 @@ export const deleteTask = (id: string, version: number, fetcher?: Fetcher) => de
 export const setTaskStatus = (id: string, input: { version: number; status: TaskStatus }, fetcher?: Fetcher) => request<TaskDto>(`/api/v1/tasks/${id}/status`, { method: "POST", body: input }, fetcher);
 export const setTaskArchived = (id: string, version: number, archived: boolean, fetcher?: Fetcher) => request<TaskDto>(`/api/v1/tasks/${id}/${archived ? "archive" : "unarchive"}`, { method: "POST", body: { version } }, fetcher);
 export const listTaskEvents = (id: string, fetcher?: Fetcher) => listRequest<TaskEventDto>(`/api/v1/tasks/${id}/events?page_size=100`, fetcher);
+
+export type RecurrenceFrequency = "daily" | "weekly" | "monthly";
+export type RecurrenceStatus = "active" | "stopped" | "expired";
+export type RuleMetaDto = {
+  id: string; version: number; created_at: string; updated_at: string; frequency: RecurrenceFrequency; interval: number;
+  start_date: string; end_date: string | null; timezone: string; status: RecurrenceStatus; next_date: string | null;
+  last_generated_date: string | null; processing_updated_at: string | null; blocked_reason: string | null;
+};
+export type TaskRuleDto = RuleMetaDto & { title: string; description: string | null; project_id: string | null; priority: TaskPriority };
+export type RuleRevisionDto = { id: string; rule_id: string; rule_version: number; action: "created" | "edited" | "stopped"; snapshot: Record<string, unknown>; effective_after: string | null; changed_at: string };
+export type DependencyDto = { task_id: string; predecessor_id: string; predecessor_status: TaskStatus; predecessor_title: string; created_at: string };
+export type TaskRuleInput = { title: string; description?: string | null; project_id?: string | null; priority?: TaskPriority; frequency: RecurrenceFrequency; interval?: number; start_date: string; end_date?: string | null };
+export type TaskRulePatch = { version: number } & Partial<Omit<TaskRuleInput, "start_date">>;
+export const listTaskRules = (status: RecurrenceStatus | "all" = "active", fetcher?: Fetcher) => listRequest<TaskRuleDto>(`/api/v1/tasks/recurrences?status=${status}&page_size=100`, fetcher);
+export const createTaskRule = (input: TaskRuleInput, fetcher?: Fetcher) => request<TaskRuleDto>("/api/v1/tasks/recurrences", { method: "POST", body: input, idempotencyKey: idempotencyKey() }, fetcher);
+export const patchTaskRule = (id: string, input: TaskRulePatch, fetcher?: Fetcher) => request<TaskRuleDto>(`/api/v1/tasks/recurrences/${id}`, { method: "PATCH", body: input }, fetcher);
+export const stopTaskRule = (id: string, version: number, fetcher?: Fetcher) => request<TaskRuleDto>(`/api/v1/tasks/recurrences/${id}/stop`, { method: "POST", body: { version } }, fetcher);
+export const listTaskRuleOccurrences = (id: string, from: string, to: string, fetcher?: Fetcher) => listRequest<TaskDto>(`/api/v1/tasks/recurrences/${id}/occurrences?from=${from}&to=${to}&page_size=100`, fetcher);
+export const listTaskRuleRevisions = (id: string, fetcher?: Fetcher) => listRequest<RuleRevisionDto>(`/api/v1/tasks/recurrences/${id}/revisions?page_size=100`, fetcher);
+export const listTaskDependencies = (id: string, fetcher?: Fetcher) => listRequest<DependencyDto>(`/api/v1/tasks/${id}/dependencies?page_size=100`, fetcher);
+export const setTaskDependency = (id: string, predecessorId: string, fetcher?: Fetcher) => request<DependencyDto>(`/api/v1/tasks/${id}/dependencies/${predecessorId}`, { method: "PUT" }, fetcher);
+export const deleteTaskDependency = (id: string, predecessorId: string, fetcher?: Fetcher) => deleteWithoutBody(`/api/v1/tasks/${id}/dependencies/${predecessorId}`, fetcher);
 
 export type HabitScheduleDto = { id: string; habit_id: string; effective_from: string; weekdays: number[]; created_at: string };
 export type HabitCheckInDto = { id: string; habit_id: string; date: string; checked_at: string; created_at: string };
@@ -291,7 +347,7 @@ export type FinanceCategoryDto = { id: string; version: number; created_at: stri
 export type FinanceTransactionDto = {
   id: string; version: number; created_at: string; updated_at: string; type: FinanceTransactionType; status: FinanceTransactionStatus;
   account_id: string; to_account_id: string | null; category_id: string | null; amount: string; date: string; note: string | null;
-  posted_at: string | null; voided_at: string | null; recurrence_rule_id: null; occurrence_date: null; rule_version: null;
+  posted_at: string | null; voided_at: string | null; recurrence_rule_id: string | null; occurrence_date: string | null; rule_version: number | null;
 };
 export type FinanceRevisionDto = { id: string; transaction_id: string; transaction_version: number; action: "created" | "edited" | "posted" | "voided"; snapshot: FinanceTransactionDto; changed_at: string };
 export type FinanceBudgetDto = { id: string; version: number; created_at: string; updated_at: string; category_id: string; month: string; limit_amount: string; spent: string; remaining: string };
@@ -314,10 +370,40 @@ export const postFinanceTransaction = (id: string, version: number, fetcher?: Fe
 export const voidFinanceTransaction = (id: string, version: number, fetcher?: Fetcher) => request<FinanceTransactionDto>(`/api/v1/finance/transactions/${id}/void`, { method: "POST", body: { version } }, fetcher);
 export const listFinanceRevisions = (id: string, fetcher?: Fetcher) => listRequest<FinanceRevisionDto>(`/api/v1/finance/transactions/${id}/revisions?page_size=100`, fetcher);
 
+export type FinanceRuleDto = RuleMetaDto & {
+  type: FinanceTransactionType; account_id: string; to_account_id: string | null; category_id: string | null; amount: string; note: string | null;
+};
+export type FinanceRuleInput = { type: FinanceTransactionType; account_id: string; to_account_id?: string | null; category_id?: string | null; amount: string; note?: string | null; frequency: RecurrenceFrequency; interval?: number; start_date: string; end_date?: string | null };
+export type FinanceRulePatch = { version: number } & Partial<Omit<FinanceRuleInput, "start_date">>;
+export const listFinanceRules = (status: RecurrenceStatus | "all" = "active", fetcher?: Fetcher) => listRequest<FinanceRuleDto>(`/api/v1/finance/recurrences?status=${status}&page_size=100`, fetcher);
+export const createFinanceRule = (input: FinanceRuleInput, fetcher?: Fetcher) => request<FinanceRuleDto>("/api/v1/finance/recurrences", { method: "POST", body: input, idempotencyKey: idempotencyKey() }, fetcher);
+export const patchFinanceRule = (id: string, input: FinanceRulePatch, fetcher?: Fetcher) => request<FinanceRuleDto>(`/api/v1/finance/recurrences/${id}`, { method: "PATCH", body: input }, fetcher);
+export const stopFinanceRule = (id: string, version: number, fetcher?: Fetcher) => request<FinanceRuleDto>(`/api/v1/finance/recurrences/${id}/stop`, { method: "POST", body: { version } }, fetcher);
+export const listFinanceRuleOccurrences = (id: string, from: string, to: string, fetcher?: Fetcher) => listRequest<FinanceTransactionDto>(`/api/v1/finance/recurrences/${id}/occurrences?from=${from}&to=${to}&page_size=100`, fetcher);
+export const listFinanceRuleRevisions = (id: string, fetcher?: Fetcher) => listRequest<RuleRevisionDto>(`/api/v1/finance/recurrences/${id}/revisions?page_size=100`, fetcher);
+
 export const listFinanceBudgets = (month: string, fetcher?: Fetcher) => listRequest<FinanceBudgetDto>(`/api/v1/finance/budgets?month=${month}&page_size=100`, fetcher);
 export const createFinanceBudget = (input: { category_id: string; month: string; limit_amount: string }, fetcher?: Fetcher) => request<FinanceBudgetDto>("/api/v1/finance/budgets", { method: "POST", body: input, idempotencyKey: idempotencyKey() }, fetcher);
 export const patchFinanceBudget = (id: string, version: number, limitAmount: string, fetcher?: Fetcher) => request<FinanceBudgetDto>(`/api/v1/finance/budgets/${id}`, { method: "PATCH", body: { version, limit_amount: limitAmount } }, fetcher);
 export const deleteFinanceBudget = (id: string, version: number, fetcher?: Fetcher) => deleteRequest(`/api/v1/finance/budgets/${id}`, version, fetcher);
+
+export type ReportRangeDto = { from: string; to: string; timezone: string };
+export type TaskReportDto = { completed_count: number; distinct_task_count: number; per_project: Array<{ project_id: string | null; project_name_snapshot: string | null; completed_count: number; distinct_task_count: number }> };
+export type PomodoroReportDto = { focus_duration_ms: number; focus_duration_seconds: number; completed_focus_count: number; cancelled_focus_count: number; per_project: Array<{ project_id: string | null; project_name_snapshot: string | null; focus_duration_ms: number; focus_duration_seconds: number }> };
+export type HabitReportDto = Array<{ habit_id: string; name: string; timezone: string; scheduled_days: number; completed_days: number; ratio: number | null }>;
+export type FinanceReportDto = { income: string; expense: string; net: string; per_category: Array<{ category_id: string; type: "income" | "expense"; total: string }>; basis: "current_corrected_transactions" };
+export type BudgetReportDto = Array<{ month: string; category_id: string; limit_amount: string; spent: string; remaining: string; basis: "full_calendar_month" }>;
+
+export const getTaskReport = (from?: string, to?: string, fetcher?: Fetcher) => request<{ range: ReportRangeDto; tasks: TaskReportDto }>(`/api/v1/tasks/reports/summary${reportQuery(from, to)}`, {}, fetcher);
+export const getProjectReport = (id: string, from?: string, to?: string, fetcher?: Fetcher) => request<{ range: ReportRangeDto; tasks: TaskReportDto; pomodoro: PomodoroReportDto }>(`/api/v1/projects/${id}/reports/summary${reportQuery(from, to)}`, {}, fetcher);
+export const getHabitReport = (from?: string, to?: string, fetcher?: Fetcher) => request<{ range: ReportRangeDto; habits: HabitReportDto }>(`/api/v1/habits/reports/summary${reportQuery(from, to)}`, {}, fetcher);
+export const getPomodoroReport = (from?: string, to?: string, fetcher?: Fetcher) => request<{ range: ReportRangeDto; pomodoro: PomodoroReportDto }>(`/api/v1/pomodoro/reports/summary${reportQuery(from, to)}`, {}, fetcher);
+export const getFinanceReport = (from?: string, to?: string, fetcher?: Fetcher) => request<{ range: ReportRangeDto; finance: FinanceReportDto; budgets: BudgetReportDto }>(`/api/v1/finance/reports/summary${reportQuery(from, to)}`, {}, fetcher);
+export const downloadTaskCsv = (from?: string, to?: string, fetcher?: Fetcher) => csvRequest(`/api/v1/tasks/reports/export${reportQuery(from, to)}`, fetcher);
+export const downloadProjectCsv = (id: string, section: "tasks" | "pomodoro", from?: string, to?: string, fetcher?: Fetcher) => csvRequest(`/api/v1/projects/${id}/reports/export${reportQuery(from, to)}${from && to ? "&" : "?"}section=${section}`, fetcher);
+export const downloadHabitCsv = (from?: string, to?: string, fetcher?: Fetcher) => csvRequest(`/api/v1/habits/reports/export${reportQuery(from, to)}`, fetcher);
+export const downloadPomodoroCsv = (from?: string, to?: string, fetcher?: Fetcher) => csvRequest(`/api/v1/pomodoro/reports/export${reportQuery(from, to)}`, fetcher);
+export const downloadFinanceCsv = (section: "finance" | "budgets", from?: string, to?: string, fetcher?: Fetcher) => csvRequest(`/api/v1/finance/reports/export${reportQuery(from, to)}${from && to ? "&" : "?"}section=${section}`, fetcher);
 
 export type LoginUser = {
   id: string;

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AppShell from "@/components/AppShell";
 import Modal from "@/components/Modal";
+import ReportPanel from "@/components/ReportPanel";
 import { cancelPomodoro, getPomodoroActive, listPomodoroSessions, listTasks, pausePomodoro, resumePomodoro, startPomodoro, TrackerApiError, type PomodoroBundleDto, type PomodoroPhase, type PomodoroSessionDto, type TaskDto } from "@/lib/api";
 
 const DURATION: Record<PomodoroPhase, number> = { focus: 1500, short_break: 300, long_break: 900 };
@@ -93,6 +94,7 @@ export default function PomodoroPage() {
   return (
     <AppShell active="pomodoro" title="Pomodoro">
       <div className="page-head"><h1>Pomodoro</h1><span className="sample-tag">Server timer</span></div>
+      <ReportPanel scope="pomodoro" />
       {pageError && <div className="form-alert error" role="alert" style={{ marginBottom: 16 }}>{pageError}</div>}
       {loading ? <div className="empty-state"><p>Loading Pomodoro…</p></div> : !bundle ? <div className="empty-state"><p>Pomodoro is unavailable.</p></div> : (
         <div className="pomo-layout">
