@@ -27,7 +27,7 @@ function projectDto(project: Project, counts: { done: number; total: number }): 
   };
 }
 
-function taskDto(task: Task): TaskDto {
+export function taskDto(task: Task): TaskDto {
   return {
     id: task.id,
     version: task.version,
@@ -251,6 +251,8 @@ export function createPrismaM1Service(db: PrismaClient, options: { now?: () => D
         await assertProjectActive(tx, userId, current.project_id);
         const projectId = input.project_id === undefined ? current.project_id : input.project_id;
         if (projectId !== current.project_id) {
+          const dependency = await tx.taskDependency.findFirst({ where: { user_id: userId, OR: [{ task_id: id }, { predecessor_id: id }] } });
+          if (dependency) throw new WorkError(409, "RESOURCE_IN_USE", "Remove this task's dependencies before moving it to another project.");
           const focus = await tx.pomodoroSession.findFirst({ where: { user_id: userId, task_id: id, phase: "focus", status: { in: ["running", "paused"] } } });
           if (focus) throw new WorkError(409, "POMODORO_IN_PROGRESS", "Finish or cancel the active focus session first.");
         }
@@ -282,8 +284,14 @@ export function createPrismaM1Service(db: PrismaClient, options: { now?: () => D
         if (current.archived_at) throw new WorkError(409, "INVALID_STATE", "Unarchive the task before changing its status.");
         if (current.status === input.status) return taskDto(current);
         if (input.status === "done") {
+          const blocked = await tx.taskDependency.findFirst({ where: { user_id: userId, task_id: id, predecessor: { status: { not: "done" } } } });
+          if (blocked) throw new WorkError(409, "TASK_BLOCKED", "Finish every predecessor before completing this task.");
           const focus = await tx.pomodoroSession.findFirst({ where: { user_id: userId, task_id: id, phase: "focus", status: { in: ["running", "paused"] } } });
           if (focus) throw new WorkError(409, "POMODORO_IN_PROGRESS", "Finish or cancel the active focus session first.");
+        }
+        if (current.status === "done" && input.status !== "done") {
+          const completedSuccessor = await tx.taskDependency.findFirst({ where: { user_id: userId, predecessor_id: id, task: { status: "done" } } });
+          if (completedSuccessor) throw new WorkError(409, "TASK_BLOCKED", "Reopen completed successor tasks before reopening this predecessor.");
         }
         const updated = await tx.task.updateMany({ where: { id, user_id: userId, version: input.version }, data: { status: input.status, completed_at: input.status === "done" ? now() : null, version: { increment: 1 } } });
         if (updated.count !== 1) throw new WorkError(409, "VERSION_CONFLICT", "The task changed. Refresh and try again.");

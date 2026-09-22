@@ -645,10 +645,10 @@ model FinanceTransaction {
   category   FinanceCategory?             @relation(fields: [user_id, category_id], references: [user_id, id])
   revisions  FinanceTransactionRevision[]
   recurrence_rule FinanceRecurrenceRule? @relation("FinanceOccurrenceRule", fields: [user_id, recurrence_rule_id], references: [user_id, id])
-  recurrence_revision FinanceRecurrenceRevision? @relation("FinanceOccurrenceRevision", fields: [user_id, recurrence_rule_id, rule_version], references: [user_id, rule_id, rule_version])
+  recurrence_revision FinanceRecurrenceRevision? @relation("FinanceOccurrenceRevision", fields: [user_id, recurrence_rule_id, rule_version], references: [user_id, rule_id, rule_version], map: "finance_transaction_user_id_recurrence_rule_id_rule_version_fke")
 
   @@unique([user_id, id])
-  @@unique([recurrence_rule_id, occurrence_date])
+  @@unique([recurrence_rule_id, occurrence_date], map: "finance_recurrence_rule_id_occurrence_date_key")
   @@index([user_id, date, status])
   @@index([account_id, status])
   @@index([to_account_id, status])

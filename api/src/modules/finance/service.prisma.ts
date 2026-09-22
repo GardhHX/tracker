@@ -229,6 +229,8 @@ export function createPrismaM3Service(db: PrismaClient, options: { now?: () => D
       return db.$transaction(async (tx) => {
         const current = await ownedAccount(tx, userId, id); assertVersion(current.version, version);
         if (current.archived_at) return loadAccountDto(tx, userId, id);
+        const activeRule = await tx.financeRecurrenceRule.findFirst({ where: { user_id: userId, status: "active", OR: [{ account_id: id }, { to_account_id: id }] } });
+        if (activeRule) throw new FinanceError(409, "RESOURCE_IN_USE", "Stop active recurrence rules before archiving this account.");
         const changed = await tx.financeAccount.updateMany({ where: { user_id: userId, id, version }, data: { archived_at: now(), version: { increment: 1 } } });
         if (changed.count !== 1) throw new FinanceError(409, "VERSION_CONFLICT", "The account changed. Refresh and try again.");
         return loadAccountDto(tx, userId, id);
@@ -279,6 +281,8 @@ export function createPrismaM3Service(db: PrismaClient, options: { now?: () => D
       return db.$transaction(async (tx) => {
         const current = await ownedCategory(tx, userId, id); assertVersion(current.version, version);
         if (current.archived_at) return categoryDto(current);
+        const activeRule = await tx.financeRecurrenceRule.findFirst({ where: { user_id: userId, category_id: id, status: "active" } });
+        if (activeRule) throw new FinanceError(409, "RESOURCE_IN_USE", "Stop active recurrence rules before archiving this category.");
         const changed = await tx.financeCategory.updateMany({ where: { user_id: userId, id, version }, data: { archived_at: now(), version: { increment: 1 } } });
         if (changed.count !== 1) throw new FinanceError(409, "VERSION_CONFLICT", "The category changed. Refresh and try again.");
         return categoryDto(await ownedCategory(tx, userId, id));
