@@ -1,6 +1,6 @@
 # Kontrak API Tracker
 
-Versi 0.4. Tanggal: 22 September 2026. Status: endpoint M0–M3 diimplementasikan; M4–M6 tetap kontrak rancangan. [SCHEMA](SCHEMA.md) menetapkan data dan constraint; [PRD](PRD.md) menetapkan transisi. Revisi 0.4 hanya mengganti penyedia flow Google OAuth dari Auth.js ke library OIDC di API custom (DECISIONS D-43/D-45); kontrak endpoint, DTO, dan proteksi lain tidak berubah.
+Versi 0.4. Tanggal: 22 September 2026. Status: endpoint M0–M5 diimplementasikan; M6 tetap kontrak rancangan. M5 memakai fakta historis dan tabel M0–M4 yang sudah ada, sehingga tidak memerlukan migrasi baru. [SCHEMA](SCHEMA.md) menetapkan data dan constraint; [PRD](PRD.md) menetapkan transisi. Revisi 0.4 hanya mengganti penyedia flow Google OAuth dari Auth.js ke library OIDC di API custom (DECISIONS D-43/D-45); kontrak endpoint, DTO, dan proteksi lain tidak berubah.
 
 ## HTTP, versi, dan idempotensi
 
@@ -44,7 +44,7 @@ Contoh error sintetis:
 
 ## DTO respons eksplisit
 
-BaseResource = id,version,created_at,updated_at; semua field berikut ditambahkan ke base kecuali disebutkan berbeda. Tanda ? berarti nilai dapat null, bukan key boleh hilang. Mapper sebelum M4 mengembalikan metadata recurrence occurrence sebagai null tanpa membutuhkan kolom M4.
+BaseResource = id,version,created_at,updated_at; semua field berikut ditambahkan ke base kecuali disebutkan berbeda. Tanda ? berarti nilai dapat null, bukan key boleh hilang. Mapper Task dan FinanceTransaction mengembalikan metadata recurrence occurrence yang tersimpan; data manual lama tetap bernilai null untuk ketiga field recurrence.
 
 | DTO | Field respons |
 |---|---|

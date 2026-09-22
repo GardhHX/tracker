@@ -2,7 +2,7 @@
 
 Tracker adalah rancangan aplikasi web responsif untuk mengelola aktivitas pribadi, keuangan, dan proyek dalam satu akun.
 
-Status per 22 September 2026: dokumentasi spesifikasi 0.4 tersedia. Frontend SPA (Vite + React) terhubung ke API Express untuk autentikasi serta modul M1, M2, dan M3. Migrasi M0 sampai M3 telah diterapkan ke database pengembangan Supabase; lihat [status backend](api/STATUS.md). M2 mencakup Habit, Timebox, dan Pomodoro dengan deadline server serta pemulihan setelah reload. M3 mencakup akun keuangan, kategori, transaksi/transfer, revision history, dan anggaran persisten. Modul M4 dan seterusnya belum diimplementasikan. Kebutuhan berasal dari percakapan perencanaan, bukan riset pengguna atau pengukuran penggunaan. Revisi 0.2 mengganti pencatat waktu bebas menjadi Pomodoro. Revisi 0.3 menetapkan Timebox, siklus Pomodoro harian, default UI Inggris, kemampuan turunan di modul sumber, dashboard tanpa rincian keuangan, serta logout semua perangkat. Revisi 0.4 menyelaraskan keputusan teknis ke implementasi nyata: frontend adalah SPA Vite + React (bukan Next.js), backend menjadi API Node terpisah (Express), dan database memakai Supabase (PostgreSQL terkelola); model auth custom tetap. Lihat [DECISIONS](DECISIONS.md) D-40..D-45.
+Status per 22 September 2026: dokumentasi spesifikasi 0.4 tersedia. Frontend SPA (Vite + React) terhubung ke API Express untuk autentikasi serta modul M1 sampai M5. Migrasi M0 sampai M4 telah diterapkan ke database pengembangan Supabase; M5 memakai fakta historis yang sudah ada, tanpa tabel atau migrasi baru. Lihat [status backend](api/STATUS.md). M2 mencakup Habit, Timebox, dan Pomodoro dengan deadline server serta pemulihan setelah reload. M3 mencakup akun keuangan, kategori, transaksi/transfer, revision history, dan anggaran persisten. M4 menambah recurring task/transaction, rule revision dan occurrence history, serta dependensi tugas di dalam modul Tasks dan Finance. M5 menambah laporan per rentang tanggal dan CSV pada Tasks, Project detail, Habits, Pomodoro, dan Finance. Kebutuhan berasal dari percakapan perencanaan, bukan riset pengguna atau pengukuran penggunaan. Revisi 0.2 mengganti pencatat waktu bebas menjadi Pomodoro. Revisi 0.3 menetapkan Timebox, siklus Pomodoro harian, default UI Inggris, kemampuan turunan di modul sumber, dashboard tanpa rincian keuangan, serta logout semua perangkat. Revisi 0.4 menyelaraskan keputusan teknis ke implementasi nyata: frontend adalah SPA Vite + React (bukan Next.js), backend menjadi API Node terpisah (Express), dan database memakai Supabase (PostgreSQL terkelola); model auth custom tetap. Lihat [DECISIONS](DECISIONS.md) D-40..D-45.
 
 ## Dokumen
 
@@ -17,6 +17,7 @@ Status per 22 September 2026: dokumentasi spesifikasi 0.4 tersedia. Frontend SPA
 | 7 | [API](API-SPEC.md) | Kontrak HTTP dan format data |
 | 8 | [Rencana implementasi](PLAN.md) | Tahap pembangunan dan syarat selesai |
 | 9 | [Rencana pengujian](TEST-PLAN.md) | Skenario dan bukti yang harus dikumpulkan |
+| 10 | [M6 release checklist](ops/RELEASE-CHECKLIST.md) | Local gate, probe/log events, and the external release evidence required |
 
 ## Cakupan versi pertama
 
@@ -63,11 +64,11 @@ Backend menyediakan `npm test`, `npm run test:integration`, `npm run typecheck`,
 - `/forgot-password`, `/verify-email`: UI akun tersedia, tetapi integrasi API frontend masih perlu diselesaikan.
 - `/privacy`: keterangan data pratinjau, bukan kebijakan produksi.
 - `/dashboard`: dashboard persisten dengan Timebox, tugas, kebiasaan, dan kontrol Pomodoro, tanpa rincian keuangan.
-- `/tasks`: terhubung ke API M1; menyediakan create/edit, status/reopen, arsip, List/Kanban, filter status/proyek/tenggat/arsip, serta completion history dari snapshot `TaskEvent` immutable. Metadata recurrence tetap `null` sampai M4.
+- `/tasks`: terhubung ke API M1/M4; menyediakan create/edit, status/reopen, arsip, List/Kanban, filter status/proyek/tenggat/arsip, completion history dari snapshot `TaskEvent` immutable, recurring rule beserta occurrence/revision history, dan dependency tugas proyek.
 - `/habits`: habit persisten dengan jadwal berversi, check-in per tanggal, riwayat yang dapat dikoreksi, zona tetap, dan arsip terminal.
 - `/pomodoro`: timer persisten 25/5/15 dengan pause/resume/cancel, siklus harian, deadline server, reload recovery, dan riwayat sesi.
-- `/projects`: terhubung ke API M1; menyediakan create/edit, complete/archive/reopen, progres dari tugas tidak diarsipkan, serta Board/List yang membaca tugas persisten yang sama. Dependensi tugas baru masuk M4.
-- `/finance/accounts`: akun IDR, kategori, transaksi manual, transfer, koreksi/void dengan revision history, saldo terhitung, serta anggaran bulanan persisten melalui API M3.
+- `/projects`: terhubung ke API M1; menyediakan create/edit, complete/archive/reopen, progres dari tugas tidak diarsipkan, serta Board/List yang membaca tugas persisten yang sama.
+- `/finance/accounts`: akun IDR, kategori, transaksi manual, transfer, koreksi/void dengan revision history, saldo terhitung, anggaran bulanan persisten, serta recurring transaction di dalam Transactions melalui API M3/M4.
 - `/settings`: UI profil dan pengaturan akun termasuk penautan Google dan logout semua perangkat; belum terhubung server.
 
 Tahapan M0 sampai M6 dalam PLAN tetap merupakan rencana MVP, bukan klaim bahwa seluruh produk telah selesai. Arah visual dan referensi Mobbin yang diperiksa ada di [DESIGN](DESIGN.md).
